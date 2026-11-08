@@ -87,8 +87,9 @@ predictions nor independent ground truth. Class IDs now include broccoli head
 weed (3).
 
 For curved boundaries, **press and drag** to trace with a mouse, touch screen,
-or pen. Single clicks still add precise corner vertices. The browser batches
-redraws to animation frames and simplifies redundant stroke vertices before
+or pen. Single clicks still add precise corner vertices. The RGB photo remains
+in a separate static layer; pointer movement paints only new overlay segments
+and the exported stroke simplifies redundant vertices before
 export. Release the pointer and select **Finish polygon**. Use Undo or Remove
 to correct a trace; do not draw broad polygons around a broccoli head and its
 surrounding leaves under the same class.
