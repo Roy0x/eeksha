@@ -74,6 +74,15 @@ class CorrectionTests(unittest.TestCase):
                 self.assertEqual(zipped.read("original_annotation.zip"), archive)
                 self.assertIn("semantic_cloud.ply", zipped.namelist())
 
+    def test_load_form_only_requires_zip_and_rgb(self):
+        with APP.test_client() as client:
+            response = client.get("/correct")
+            self.assertEqual(response.status_code, 200)
+            page = response.data.decode("utf-8")
+            self.assertIn("function readyForLoad(){return source('archive')&&source('rgb');}", page)
+            self.assertIn("function readyForExport()", page)
+            self.assertIn("Image loaded and sources verified", page)
+
 
 if __name__ == "__main__":
     unittest.main()
