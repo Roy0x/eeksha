@@ -86,6 +86,13 @@ predictions nor independent ground truth. Class IDs now include broccoli head
 (4) and broccoli leaf (5), in addition to unknown (0), soil (1), crop (2),
 weed (3).
 
+For curved boundaries, **press and drag** to trace with a mouse, touch screen,
+or pen. Single clicks still add precise corner vertices. The browser batches
+redraws to animation frames and simplifies redundant stroke vertices before
+export. Release the pointer and select **Finish polygon**. Use Undo or Remove
+to correct a trace; do not draw broad polygons around a broccoli head and its
+surrounding leaves under the same class.
+
 The WE3DS authors report stereo calibration **per measurement date**, followed by
 rectification and cropping to 1600x1144. The public dataset card describes the
 camera setup, but does not provide the exact effective rectified/cropped intrinsics
