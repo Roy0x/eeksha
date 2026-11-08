@@ -1,0 +1,10 @@
+{
+  "fx": 110,
+  "fy": 110,
+  "cx": 59.5,
+  "cy": 44.5,
+  "depth_scale": 0.001,
+  "width": 120,
+  "height": 90,
+  "depth_type": "axial_z"
+}
