@@ -54,6 +54,25 @@ WE3DS is an external dataset by Kitzler et al. (2023), not Eeksha-collected data
 
 ## Conditional calibrated 3D export
 
+### Real broccoli field RGB-D validation (Mendeley dataset v3)
+
+The independently published [baby-broccoli RGB-D dataset](https://doi.org/10.17632/px5p6zdk6k.3)
+is licensed CC BY 4.0. Download `camera_intrinsics.json` and matching
+`day_rgb_XXXX.png` / `day_depth_XXXX.png` pairs. Keep the inputs outside the
+repository. Then run:
+
+```bash
+python real_field_demo.py --input /path/to/input --output /path/to/results --limit 3
+```
+
+The adapter takes the **aligned-to-RGB** intrinsics and millimetre axial-Z
+convention explicitly documented in the supplied metadata. It excludes zero
+and out-of-range depth and writes point clouds, per-pair QA, and
+`field_summary.json`. **All points have class `unknown` (0)** because the
+provided RGB-D frames have no pixel-level semantic masks. This is not crop
+segmentation or an independent metric-accuracy benchmark. The original
+authors retain credit for capturing and curating the field data.
+
 The WE3DS authors report stereo calibration **per measurement date**, followed by
 rectification and cropping to 1600x1144. The public dataset card describes the
 camera setup, but does not provide the exact effective rectified/cropped intrinsics
