@@ -13,7 +13,7 @@ from PIL import UnidentifiedImageError, Image
 from annotation import record_annotations
 from annotation_page import PAGE as ANNOTATOR_PAGE
 from real_field_demo import convert_intrinsics
-from review import compare_exports
+from review import compare_exports, make_rgb_overlay
 from review_page import PAGE as REVIEW_PAGE
 from eeksha import make_demo, process
 from viewer import generate_viewer
@@ -59,10 +59,15 @@ def annotation_review():
     try:
         summary, preview = compare_exports(request.files["first"].read(),
                                            request.files["second"].read())
+        overlay = {}
+        if "rgb" in request.files and request.files["rgb"].filename:
+            rgb, transparent = make_rgb_overlay(request.files["rgb"].read(), preview, summary)
+            overlay = {"verified_rgb_base64": base64.b64encode(rgb).decode("ascii"),
+                       "transparent_overlay_base64": base64.b64encode(transparent).decode("ascii")}
     except (ValueError, OSError) as exc:
         return {"error": str(exc)}, 422
     return {"summary": summary,
-            "disagreement_preview_base64": base64.b64encode(preview).decode("ascii")}
+            "disagreement_preview_base64": base64.b64encode(preview).decode("ascii"), **overlay}
 
 
 @APP.post("/annotate")

@@ -101,3 +101,29 @@ def compare_exports(first: bytes, second: bytes) -> tuple[dict, bytes]:
                "warning": "Agreement is not accuracy. The system cannot verify that annotators are independent or labels are correct.",
                "legend": {"green": "both same class", "pink": "A only", "orange": "B only", "red": "conflicting classes", "black": "both unknown"}}
     return summary, image_buf.getvalue()
+
+
+def make_rgb_overlay(rgb_data: bytes, preview_png: bytes, summary: dict) -> tuple[bytes, bytes]:
+    """Verify the exact source RGB before pairing it with an alpha disagreement mask."""
+    if not rgb_data or len(rgb_data) > 20 * 1024 * 1024:
+        raise ValueError("RGB image is empty or exceeds 20 MB")
+    if hashlib.sha256(rgb_data).hexdigest() != summary["source_rgb_sha256"]:
+        raise ValueError("RGB image SHA-256 does not match the annotation source")
+    try:
+        with Image.open(io.BytesIO(rgb_data)) as original:
+            if original.format != "PNG" or original.mode not in ("RGB", "RGBA"):
+                raise ValueError("Source RGB must be an RGB/RGBA PNG")
+            if original.size != (summary["image_size"]["width"], summary["image_size"]["height"]):
+                raise ValueError("RGB image dimensions do not match annotation masks")
+            rgb = original.convert("RGB")
+            rgb.load()
+    except (OSError, Image.DecompressionBombError) as exc:
+        raise ValueError("Invalid source RGB PNG") from exc
+    with Image.open(io.BytesIO(preview_png)) as image:
+        overlay = np.array(image.convert("RGBA"))
+    # Both unknown remains transparent so underlying field pixels are visible.
+    overlay[:, :, 3] = np.where(np.any(overlay[:, :, :3] != 0, axis=2), 255, 0)
+    source_buf, overlay_buf = io.BytesIO(), io.BytesIO()
+    rgb.save(source_buf, format="PNG")
+    Image.fromarray(overlay, mode="RGBA").save(overlay_buf, format="PNG")
+    return source_buf.getvalue(), overlay_buf.getvalue()
