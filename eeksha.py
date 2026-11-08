@@ -7,7 +7,7 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 
-CLASSES = {0: "unknown", 1: "soil", 2: "crop", 3: "weed"}
+CLASSES = {0: "unknown", 1: "soil", 2: "crop", 3: "weed", 4: "broccoli_head", 5: "broccoli_leaf"}
 
 
 def process(rgb_path: Path, depth_path: Path, labels_path: Path, calibration_path: Path,
@@ -20,7 +20,7 @@ def process(rgb_path: Path, depth_path: Path, labels_path: Path, calibration_pat
     if not np.issubdtype(depth.dtype, np.integer) and not np.issubdtype(depth.dtype, np.floating):
         raise ValueError("Depth must be numeric")
     if not np.issubdtype(labels.dtype, np.integer) or not np.isin(labels, list(CLASSES)).all():
-        raise ValueError("Labels must be integer class IDs 0, 1, 2, or 3")
+        raise ValueError("Labels must be integer class IDs 0 through 5")
     calibration = json.loads(calibration_path.read_text(encoding="utf-8"))
     for key in ("fx", "fy", "cx", "cy", "depth_scale"):
         if key not in calibration or isinstance(calibration[key], bool) or not isinstance(calibration[key], (int, float)) or not np.isfinite(calibration[key]):

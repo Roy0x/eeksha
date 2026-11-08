@@ -73,6 +73,19 @@ provided RGB-D frames have no pixel-level semantic masks. This is not crop
 segmentation or an independent metric-accuracy benchmark. The original
 authors retain credit for capturing and curating the field data.
 
+### Manual polygon annotation → labeled 3D
+
+Start the local Flask app (`python webapp.py`) and open
+`http://127.0.0.1:8012/annotator`. Load a matching RGB PNG, 16-bit depth
+PNG, and the published `camera_intrinsics.json`. Draw polygons around broccoli
+heads, leaves, soil, other crop, or weeds; finish each polygon before exporting.
+The ZIP includes `annotations.json`, `labels.png`, calibrated PLY/NPZ, the
+original calibration, and quality reports. Pixels outside polygons remain
+`unknown`. The manual annotations are explicitly **unreviewed**, neither AI
+predictions nor independent ground truth. Class IDs now include broccoli head
+(4) and broccoli leaf (5), in addition to unknown (0), soil (1), crop (2),
+weed (3).
+
 The WE3DS authors report stereo calibration **per measurement date**, followed by
 rectification and cropping to 1600x1144. The public dataset card describes the
 camera setup, but does not provide the exact effective rectified/cropped intrinsics

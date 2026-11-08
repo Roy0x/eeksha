@@ -9,7 +9,10 @@ import zipfile
 from pathlib import Path
 
 from flask import Flask, Response, abort, render_template_string, request, send_file
-from PIL import UnidentifiedImageError
+from PIL import UnidentifiedImageError, Image
+from annotation import record_annotations
+from annotation_page import PAGE as ANNOTATOR_PAGE
+from real_field_demo import convert_intrinsics
 from eeksha import make_demo, process
 from viewer import generate_viewer
 from we3ds import inspect_we3ds
@@ -37,6 +40,55 @@ def build_run(folder: Path, synthetic: bool) -> tuple[dict, str, bytes]:
 @APP.get("/")
 def index():
     return render_template_string(PAGE)
+
+
+@APP.get("/annotator")
+def annotator():
+    return Response(ANNOTATOR_PAGE, mimetype="text/html")
+
+
+@APP.post("/annotate")
+def annotated_upload():
+    """Reconstruct only human-drawn class polygons; never synthesize labels."""
+    from uuid import uuid4
+
+    if any(name not in request.files or not request.files[name].filename
+           for name in ("rgb", "depth", "calibration")):
+        return {"error": "Upload RGB, matching depth, and calibration"}, 400
+    try:
+        polygons = json.loads(request.form.get("annotations", "null"))
+        with tempfile.TemporaryDirectory() as temp:
+            folder = Path(temp)
+            for field, filename in (("rgb", "rgb.png"), ("depth", "depth.png"),
+                                    ("calibration", "camera_intrinsics.json")):
+                data = request.files[field].read()
+                if not data:
+                    raise ValueError(f"Empty file: {field}")
+                (folder / filename).write_bytes(data)
+            with Image.open(folder / "rgb.png") as rgb_image:
+                record = record_annotations(folder, polygons, *rgb_image.size)
+            convert_intrinsics(folder / "camera_intrinsics.json", folder / "calibration.json")
+            report, viewer_html, archive = build_run(folder, synthetic=False)
+            report["annotation_provenance"] = record["provenance"]
+            report["annotation_review"] = record["review_status"]
+            report["labels_predicted_by_ai"] = False
+            # Include human annotation source and input calibration in the export.
+            out_bytes = io.BytesIO()
+            with zipfile.ZipFile(out_bytes, "w", compression=zipfile.ZIP_DEFLATED) as target:
+                with zipfile.ZipFile(io.BytesIO(archive)) as original:
+                    for filename in original.namelist():
+                        if filename == "qa_report.json":
+                            target.writestr(filename, json.dumps(report, indent=2))
+                        else:
+                            target.writestr(filename, original.read(filename))
+                for filename in ("annotations.json", "labels.png", "camera_intrinsics.json"):
+                    target.write(folder / filename, filename)
+    except (ValueError, TypeError, KeyError, OSError, json.JSONDecodeError, UnidentifiedImageError) as exc:
+        return {"error": str(exc)}, 422
+    token = uuid4().hex
+    RUNS.clear()
+    RUNS[token] = {"report": report, "viewer": viewer_html, "archive": out_bytes.getvalue()}
+    return {"id": token, "report": report}
 
 
 @APP.post("/process")
@@ -129,7 +181,7 @@ def download(token: str):
 PAGE = '''<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Eeksha · Agricultural Spatial Data</title><style>
 *{box-sizing:border-box}body{margin:0;background:#0c1214;color:#e9f1eb;font:15px system-ui,Segoe UI,sans-serif}header{border-bottom:1px solid #253930;padding:20px 28px;display:flex;justify-content:space-between;align-items:center}h1{margin:0;font-size:27px;letter-spacing:-1px}h1 span{color:#89e3a7}small{color:#93a79a}main{max-width:1450px;margin:auto;padding:22px;display:grid;grid-template-columns:350px 1fr;gap:18px}.panel{background:#14201d;border:1px solid #2b4438;border-radius:14px;padding:22px}h2{font-size:18px;margin:0 0 18px}label{display:block;color:#a7c2af;margin:14px 0 7px}input[type=file]{width:100%;border:1px dashed #426451;border-radius:8px;padding:10px;background:#101915;color:#cce4d4}button,.download{border:0;border-radius:8px;background:#8ae6ab;color:#0b2417;font-weight:800;padding:13px 16px;cursor:pointer;width:100%;display:block;text-align:center;text-decoration:none;margin-top:16px}button.secondary{background:#2b4938;color:#d4f1dd}iframe{width:100%;height:650px;border:0;border-radius:10px;background:#0c1417}.muted{color:#9cb2a6;line-height:1.6}.error{color:#ffad9d}#metrics{padding:12px 0;line-height:1.6}#result{display:none}@media(max-width:900px){main{grid-template-columns:1fr}iframe{height:510px}}</style></head><body>
-<header><h1>EEK<span>SHA</span> <small> / Agricultural Spatial Data</small></h1><small>LOCAL MVP · NOT A FIELD VALIDATION</small></header><main><section class="panel"><h2>01 / Input scene</h2><p class="muted">Use calibrated, aligned RGB-D imagery and class-ID masks. Files stay on your computer; this tool only listens on localhost.</p>
+<header><h1>EEK<span>SHA</span> <small> / Agricultural Spatial Data</small></h1><small>LOCAL MVP · NOT A FIELD VALIDATION</small></header><main><section class="panel"><h2>01 / Input scene</h2><p class="muted">Use calibrated, aligned RGB-D imagery and class-ID masks. Files stay on your computer; this tool only listens on localhost.</p><a class="download" href="/annotator">Open human polygon annotator →</a>
 <form id="form"><label>RGB image (PNG)</label><input type="file" name="rgb" accept="image/png"><label>Depth image (PNG, numeric)</label><input type="file" name="depth" accept="image/png"><label>Class mask (PNG, 0–3)</label><input type="file" name="labels" accept="image/png"><label>Camera calibration (JSON)</label><input type="file" name="calibration" accept="application/json,.json"><button type="submit">Process real input</button></form>
 <button class="secondary" id="demo">Load synthetic example</button><hr style="border-color:#365447;margin-top:25px"><h2>WE3DS / Real dataset inspector</h2><p class="muted">Upload the matched RGB, refined depth (16-bit), and ground-truth masks. No calibration guesses; 3D export stays blocked.</p><form id="we3ds-form"><label>WE3DS RGB PNG</label><input name="rgb" type="file" accept="image/png" required><label>WE3DS depth_refined PNG</label><input name="depth" type="file" accept="image/png" required><label>WE3DS ground_truth PNG</label><input name="labels" type="file" accept="image/png" required><button type="submit">Inspect WE3DS sample</button></form><p id="message" class="muted">No scene processed yet.</p><div id="result"><h2>03 / Quality & export</h2><div id="metrics"></div><a class="download" id="download">Download dataset ZIP</a><p class="muted">Structural checks do not establish geometric accuracy or safe robot operation.</p></div></section>
 <section class="panel"><h2>02 / Semantic 3D viewer</h2><div id="blank" class="muted">Process a sample to inspect its reconstructed point cloud.</div><iframe id="viewer" title="3D point cloud viewer" hidden></iframe></section></main>

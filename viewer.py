@@ -53,6 +53,8 @@ button{border:1px solid #466957;background:#1b3128;color:#c4f5d2;border-radius:7
 <div class="control"><label>VISIBLE CLASSES</label><div class="row"><input id="soil" type="checkbox" checked><label for="soil" style="margin:0">Soil · brown</label></div>
 <div class="row"><input id="crop" type="checkbox" checked><label for="crop" style="margin:0">Crop · green</label></div>
 <div class="row"><input id="weed" type="checkbox" checked><label for="weed" style="margin:0">Weed · orange</label></div>
+<div class="row"><input id="broccoli_head" type="checkbox" checked><label for="broccoli_head" style="margin:0">Broccoli head · cyan</label></div>
+<div class="row"><input id="broccoli_leaf" type="checkbox" checked><label for="broccoli_leaf" style="margin:0">Broccoli leaf · lime</label></div>
 <div class="row"><input id="unknown" type="checkbox" checked><label for="unknown" style="margin:0">Unknown · grey</label></div></div>
 <div class="control"><label for="size">POINT SIZE</label><input id="size" type="range" min="1" max="7" step="0.5" value="2"></div>
 <button id="reset">Reset view</button><p class="stats">Points shown: <span id="shown"></span></p></aside></main>
@@ -60,7 +62,7 @@ button{border:1px solid #466957;background:#1b3128;color:#c4f5d2;border-radius:7
 <script>
 const points=__POINTS__;
 const canvas=document.getElementById('view'),ctx=canvas.getContext('2d');
-const ids=['unknown','soil','crop','weed'];const color=['#9faab4','#80634a','#6fc681','#f1a24a'];
+const ids=['unknown','soil','crop','weed','broccoli_head','broccoli_leaf'];const color=['#9faab4','#80634a','#6fc681','#f1a24a','#59daf2','#7fee7a'];
 let yaw=-.5,pitch=.5,zoom=1,drag=false,px=0,py=0;
 const xs=points.map(p=>p[0]),ys=points.map(p=>p[1]),zs=points.map(p=>p[2]);
 const mid=[(Math.min(...xs)+Math.max(...xs))/2,(Math.min(...ys)+Math.max(...ys))/2,(Math.min(...zs)+Math.max(...zs))/2];
