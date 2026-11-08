@@ -94,6 +94,18 @@ export. Release the pointer and select **Finish polygon**. Use Undo or Remove
 to correct a trace; do not draw broad polygons around a broccoli head and its
 surrounding leaves under the same class.
 
+### V0.4 / Annotation agreement and disagreement review
+
+Open `http://127.0.0.1:8012/review` from the same local Flask app.
+Upload two Eeksha annotation-export ZIPs for the same scene, ideally drawn
+independently. The comparison validates recorded polygon-to-mask consistency,
+checks RGB/depth source hashes and calibration equality, calculates per-class
+intersection-over-union (IoU), and displays a disagreement map. The review
+state always remains `NEEDS_HUMAN_ADJUDICATION`: agreement is **not** accuracy
+or ground truth. Annotator identity and independence are not authenticated.
+To make a genuine quality claim, recruit a second annotator and have a reviewer
+resolve the colored disagreement regions before issuing an approved dataset.
+
 The WE3DS authors report stereo calibration **per measurement date**, followed by
 rectification and cropping to 1600x1144. The public dataset card describes the
 camera setup, but does not provide the exact effective rectified/cropped intrinsics

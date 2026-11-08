@@ -13,6 +13,8 @@ from PIL import UnidentifiedImageError, Image
 from annotation import record_annotations
 from annotation_page import PAGE as ANNOTATOR_PAGE
 from real_field_demo import convert_intrinsics
+from review import compare_exports
+from review_page import PAGE as REVIEW_PAGE
 from eeksha import make_demo, process
 from viewer import generate_viewer
 from we3ds import inspect_we3ds
@@ -45,6 +47,22 @@ def index():
 @APP.get("/annotator")
 def annotator():
     return Response(ANNOTATOR_PAGE, mimetype="text/html")
+
+
+@APP.route("/review", methods=["GET", "POST"])
+def annotation_review():
+    if request.method == "GET":
+        return Response(REVIEW_PAGE, mimetype="text/html")
+    if any(field not in request.files or not request.files[field].filename
+           for field in ("first", "second")):
+        return {"error": "Upload both Eeksha annotation ZIP exports"}, 400
+    try:
+        summary, preview = compare_exports(request.files["first"].read(),
+                                           request.files["second"].read())
+    except (ValueError, OSError) as exc:
+        return {"error": str(exc)}, 422
+    return {"summary": summary,
+            "disagreement_preview_base64": base64.b64encode(preview).decode("ascii")}
 
 
 @APP.post("/annotate")

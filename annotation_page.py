@@ -27,7 +27,7 @@ p{line-height:1.5;color:#afc3b4}a{color:#a1f4b4}
 <button id="finish">Finish polygon</button><button class="secondary" id="undo">Undo last vertex</button>
 <button class="secondary" id="remove">Remove last polygon</button><p id="count">0 polygons</p>
 <h2>3 · Export labeled 3D</h2><button id="export">Generate cloud and download pack</button>
-<p id="status">Choose an RGB image to begin.</p><a href="/">Return to main Eeksha</a>
+<p id="status">Choose an RGB image to begin.</p><a href="/review">Compare two annotation exports</a> · <a href="/">Return to main Eeksha</a>
 </section><section class="panel"><h2>RGB scene and explicit annotations</h2>
 <div id="canvas-wrap"><img id="photo" alt="RGB image to annotate"><canvas id="canvas" width="640" height="480"></canvas></div>
 <p>Colored regions are hand-drawn annotations. Unmarked pixels remain UNKNOWN. This is not AI inference or verified ground truth.</p>
