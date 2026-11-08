@@ -31,7 +31,7 @@ img{max-width:640px;width:100%;border:1px solid #385645}pre{white-space:pre-wrap
 <p class="source-note">Upload the exact source RGB PNG to inspect disagreement against the field image.</p></div>
 <h2>Detailed metrics</h2><pre id="metrics"></pre>
 <p class="warn">NEEDS HUMAN ADJUDICATION. This tool cannot certify labels as ground truth.</p></section>
-<a href="/annotator">Back to annotator</a></main>
+<a href="/correct">Correct annotation with brush / eraser</a> · <a href="/annotator">Back to annotator</a></main>
 <script>
 const opacity=document.getElementById('opacity'),opacityValue=document.getElementById('opacity-value');
 const overlayImage=document.getElementById('overlay'),showOverlay=document.getElementById('show-overlay');

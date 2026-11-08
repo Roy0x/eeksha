@@ -15,6 +15,9 @@ from annotation_page import PAGE as ANNOTATOR_PAGE
 from real_field_demo import convert_intrinsics
 from review import compare_exports, make_rgb_overlay
 from review_page import PAGE as REVIEW_PAGE
+from correction_page import PAGE as CORRECTION_PAGE
+from correction import correct_mask, verify_source
+from review import load_annotation
 from eeksha import make_demo, process
 from viewer import generate_viewer
 from we3ds import inspect_we3ds
@@ -47,6 +50,75 @@ def index():
 @APP.get("/annotator")
 def annotator():
     return Response(ANNOTATOR_PAGE, mimetype="text/html")
+
+
+@APP.get("/correct")
+def correction_page():
+    return Response(CORRECTION_PAGE, mimetype="text/html")
+
+
+@APP.post("/correction/prepare")
+def correction_prepare():
+    if any(name not in request.files or not request.files[name].filename for name in ("archive", "rgb")):
+        return {"error": "Upload original annotation ZIP and exact RGB PNG"}, 400
+    try:
+        original, metadata, qa = load_annotation(request.files["archive"].read())
+        rgb = request.files["rgb"].read()
+        verify_source(rgb, qa["sources"]["rgb"], "RGB")
+        with Image.open(io.BytesIO(rgb)) as image:
+            if image.format != "PNG" or image.mode not in ("RGB", "RGBA") or image.size != (original.shape[1], original.shape[0]):
+                raise ValueError("Source RGB PNG dimensions or format do not match annotation")
+        mask = io.BytesIO()
+        Image.fromarray(original.astype("uint8")).save(mask, format="PNG")
+    except (ValueError, OSError, UnidentifiedImageError) as exc:
+        return {"error": str(exc)}, 422
+    return {"width": original.shape[1], "height": original.shape[0],
+            "verified_rgb_base64": base64.b64encode(rgb).decode("ascii"),
+            "mask_preview_base64": base64.b64encode(mask.getvalue()).decode("ascii")}
+
+
+@APP.post("/correction/export")
+def correction_export():
+    from uuid import uuid4
+    if any(name not in request.files or not request.files[name].filename
+           for name in ("archive", "rgb", "depth", "calibration")):
+        return {"error": "Upload the original ZIP, RGB, depth, and camera intrinsics"}, 400
+    try:
+        archive = request.files["archive"].read()
+        strokes = json.loads(request.form.get("strokes", "null"))
+        labels, audit, original_qa = correct_mask(archive, strokes, request.form.get("reviewer", ""))
+        with tempfile.TemporaryDirectory() as temp:
+            folder = Path(temp)
+            rgb = request.files["rgb"].read()
+            depth = request.files["depth"].read()
+            verify_source(rgb, original_qa["sources"]["rgb"], "RGB")
+            verify_source(depth, original_qa["sources"]["depth"], "Depth")
+            (folder / "rgb.png").write_bytes(rgb)
+            (folder / "depth.png").write_bytes(depth)
+            (folder / "camera_intrinsics.json").write_bytes(request.files["calibration"].read())
+            convert_intrinsics(folder / "camera_intrinsics.json", folder / "calibration.json")
+            labels.save(folder / "labels.png")
+            report, viewer_html, standard_archive = build_run(folder, synthetic=False)
+            if report["calibration"] != original_qa["calibration"]:
+                raise ValueError("Camera calibration does not match original annotation")
+            report["annotation_provenance"] = audit["provenance"]
+            report["annotation_review"] = audit["review_status"]
+            report["labels_predicted_by_ai"] = False
+            output = io.BytesIO()
+            with zipfile.ZipFile(output, "w", zipfile.ZIP_DEFLATED) as zipped:
+                with zipfile.ZipFile(io.BytesIO(standard_archive)) as original:
+                    for filename in original.namelist():
+                        zipped.writestr(filename, json.dumps(report, indent=2) if filename == "qa_report.json"
+                                        else original.read(filename))
+                zipped.writestr("correction_audit.json", json.dumps(audit, indent=2))
+                zipped.writestr("original_annotation.zip", archive)
+    except (ValueError, TypeError, KeyError, OSError, json.JSONDecodeError, UnidentifiedImageError) as exc:
+        return {"error": str(exc)}, 422
+    token = uuid4().hex
+    RUNS.clear()
+    RUNS[token] = {"report": report, "viewer": viewer_html, "archive": output.getvalue()}
+    return {"id": token, "changed_pixels": audit["changed_pixels"],
+            "review_status": audit["review_status"], "ground_truth_verified": False}
 
 
 @APP.route("/review", methods=["GET", "POST"])
@@ -204,7 +276,7 @@ def download(token: str):
 PAGE = '''<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Eeksha · Agricultural Spatial Data</title><style>
 *{box-sizing:border-box}body{margin:0;background:#0c1214;color:#e9f1eb;font:15px system-ui,Segoe UI,sans-serif}header{border-bottom:1px solid #253930;padding:20px 28px;display:flex;justify-content:space-between;align-items:center}h1{margin:0;font-size:27px;letter-spacing:-1px}h1 span{color:#89e3a7}small{color:#93a79a}main{max-width:1450px;margin:auto;padding:22px;display:grid;grid-template-columns:350px 1fr;gap:18px}.panel{background:#14201d;border:1px solid #2b4438;border-radius:14px;padding:22px}h2{font-size:18px;margin:0 0 18px}label{display:block;color:#a7c2af;margin:14px 0 7px}input[type=file]{width:100%;border:1px dashed #426451;border-radius:8px;padding:10px;background:#101915;color:#cce4d4}button,.download{border:0;border-radius:8px;background:#8ae6ab;color:#0b2417;font-weight:800;padding:13px 16px;cursor:pointer;width:100%;display:block;text-align:center;text-decoration:none;margin-top:16px}button.secondary{background:#2b4938;color:#d4f1dd}iframe{width:100%;height:650px;border:0;border-radius:10px;background:#0c1417}.muted{color:#9cb2a6;line-height:1.6}.error{color:#ffad9d}#metrics{padding:12px 0;line-height:1.6}#result{display:none}@media(max-width:900px){main{grid-template-columns:1fr}iframe{height:510px}}</style></head><body>
-<header><h1>EEK<span>SHA</span> <small> / Agricultural Spatial Data</small></h1><small>LOCAL MVP · NOT A FIELD VALIDATION</small></header><main><section class="panel"><h2>01 / Input scene</h2><p class="muted">Use calibrated, aligned RGB-D imagery and class-ID masks. Files stay on your computer; this tool only listens on localhost.</p><a class="download" href="/annotator">Open human polygon annotator →</a>
+<header><h1>EEK<span>SHA</span> <small> / Agricultural Spatial Data</small></h1><small>LOCAL MVP · NOT A FIELD VALIDATION</small></header><main><section class="panel"><h2>01 / Input scene</h2><p class="muted">Use calibrated, aligned RGB-D imagery and class-ID masks. Files stay on your computer; this tool only listens on localhost.</p><a class="download" href="/annotator">Open human polygon annotator →</a><a class="download" href="/correct">Correct existing annotations →</a>
 <form id="form"><label>RGB image (PNG)</label><input type="file" name="rgb" accept="image/png"><label>Depth image (PNG, numeric)</label><input type="file" name="depth" accept="image/png"><label>Class mask (PNG, 0–3)</label><input type="file" name="labels" accept="image/png"><label>Camera calibration (JSON)</label><input type="file" name="calibration" accept="application/json,.json"><button type="submit">Process real input</button></form>
 <button class="secondary" id="demo">Load synthetic example</button><hr style="border-color:#365447;margin-top:25px"><h2>WE3DS / Real dataset inspector</h2><p class="muted">Upload the matched RGB, refined depth (16-bit), and ground-truth masks. No calibration guesses; 3D export stays blocked.</p><form id="we3ds-form"><label>WE3DS RGB PNG</label><input name="rgb" type="file" accept="image/png" required><label>WE3DS depth_refined PNG</label><input name="depth" type="file" accept="image/png" required><label>WE3DS ground_truth PNG</label><input name="labels" type="file" accept="image/png" required><button type="submit">Inspect WE3DS sample</button></form><p id="message" class="muted">No scene processed yet.</p><div id="result"><h2>03 / Quality & export</h2><div id="metrics"></div><a class="download" id="download">Download dataset ZIP</a><p class="muted">Structural checks do not establish geometric accuracy or safe robot operation.</p></div></section>
 <section class="panel"><h2>02 / Semantic 3D viewer</h2><div id="blank" class="muted">Process a sample to inspect its reconstructed point cloud.</div><iframe id="viewer" title="3D point cloud viewer" hidden></iframe></section></main>

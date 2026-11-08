@@ -106,6 +106,19 @@ or ground truth. Annotator identity and independence are not authenticated.
 To make a genuine quality claim, recruit a second annotator and have a reviewer
 resolve the colored disagreement regions before issuing an approved dataset.
 
+### V0.6 / Human brush correction and auditable 3D re-export
+
+Open `http://127.0.0.1:8012/correct`. Upload an original annotation ZIP, its
+exact RGB and depth PNG files, and the original `camera_intrinsics.json`.
+Use the brush or the `Eraser / unknown` class, zoom for precision, and undo/redo
+strokes. The original annotation is not modified; export generates new corrected
+labels and corresponding 3D PLY/NPZ, plus `correction_audit.json` and a copy
+of the original annotation ZIP. The server validates source RGB/depth SHA-256,
+calibration equality, stroke coordinates, and reviewer identifier. A reviewed
+dataset remains `HUMAN_REVIEWED_NOT_GROUND_TRUTH` until independently checked.
+The brush and zoom experience should be tested on the target laptop and in
+browser before claiming production-ready annotation ergonomics.
+
 The WE3DS authors report stereo calibration **per measurement date**, followed by
 rectification and cropping to 1600x1144. The public dataset card describes the
 camera setup, but does not provide the exact effective rectified/cropped intrinsics
