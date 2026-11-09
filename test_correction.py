@@ -97,7 +97,9 @@ class CorrectionTests(unittest.TestCase):
             page = response.data.decode("utf-8")
             self.assertIn("function readyForLoad(){return source('archive')&&source('rgb');}", page)
             self.assertIn("function readyForExport()", page)
-            self.assertIn("Image loaded and sources verified", page)
+            self.assertIn("RGB preview loaded locally", page)
+            self.assertIn("Brush corrections unlocked", page)
+            self.assertIn("previewRGB", page)
 
 
 if __name__ == "__main__":

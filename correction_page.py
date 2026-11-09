@@ -10,6 +10,7 @@ button{background:#a1e9b0;color:#14281c;font-weight:bold;cursor:pointer}.minor{b
 #viewport{overflow:auto;max-height:75vh;border:1px solid #456a50;background:#07140c}
 #stage{position:relative;width:640px;height:480px;line-height:0;transform-origin:top left}
 #photo,#paint{position:absolute;inset:0;width:100%;height:100%}#paint{touch-action:none;cursor:crosshair}
+#photo[hidden]{display:none}#image-status{font-size:13px;color:#e0c89a}
 #status{white-space:pre-wrap;color:#c5dcc9}p{color:#c1d3c6;line-height:1.5}a{color:#a1e9b0}
 #qa{white-space:pre-wrap;color:#d4ead9;line-height:1.7;border-left:3px solid #a1e9b0;padding-left:12px}
 #cloud{width:100%;height:530px;border:1px solid #456a50;margin-top:18px;background:#091316}
@@ -30,14 +31,27 @@ button{background:#a1e9b0;color:#14281c;font-weight:bold;cursor:pointer}.minor{b
 <button id="export">Export reviewed 3D dataset</button><p id="status" role="status">Load the original ZIP and source files.</p>
 <h3>Correction quality report</h3><div id="qa">Export to see before/after metrics.</div>
 <a href="/review">Comparison</a> · <a href="/annotator">Annotation</a>
-</section><section><h2>Source RGB + editable class mask</h2><div id="viewport"><div id="stage"><img id="photo" alt="verified RGB"><canvas id="paint" width="640" height="480"></canvas></div></div>
+</section><section><h2>Source RGB + editable class mask</h2><p id="image-status" role="status">Choose an RGB PNG to preview it. Annotation editing stays locked until ZIP verification.</p><div id="viewport"><div id="stage"><img id="photo" alt="Source RGB preview" hidden><canvas id="paint" width="640" height="480"></canvas></div></div>
 <p>Corrections are human-made. Eraser restores UNKNOWN. Undo/redo and pan by scrolling when zoomed. A reviewed export is not independently verified ground truth.</p>
 <iframe id="cloud" title="Corrected 3D point-cloud preview" hidden></iframe></section></main>
 <script>
 const $=id=>document.getElementById(id),canvas=$('paint'),ctx=canvas.getContext('2d',{willReadFrequently:true});
-let width=0,height=0,original=null,strokes=[],redo=[],current=null,active=null,rect=null,colors={0:[0,0,0,0],1:[186,133,83,140],2:[231,203,71,140],3:[233,87,87,140],4:[89,218,242,140],5:[127,238,122,140]};
+let width=0,height=0,original=null,strokes=[],redo=[],current=null,active=null,rect=null,previewUrl=null,selectionVersion=0,colors={0:[0,0,0,0],1:[186,133,83,140],2:[231,203,71,140],3:[233,87,87,140],4:[89,218,242,140],5:[127,238,122,140]};
 const source=(name)=>$(name).files[0];function readyForLoad(){return source('archive')&&source('rgb');}
 function readyForExport(){return ['archive','rgb','depth','calibration'].every(id=>source(id));}
+function lockEditing(){original=null;strokes=[];redo=[];ctx.clearRect(0,0,canvas.width,canvas.height);$('cloud').hidden=true;}
+function previewRGB(){selectionVersion++;lockEditing();const file=source('rgb'),photo=$('photo');
+if(previewUrl){URL.revokeObjectURL(previewUrl);previewUrl=null;}photo.hidden=true;photo.removeAttribute('src');
+if(!file){$('image-status').textContent='Choose an RGB PNG to preview it.';return;}
+previewUrl=URL.createObjectURL(file);const version=selectionVersion;
+photo.onload=()=>{if(version!==selectionVersion)return;width=photo.naturalWidth;height=photo.naturalHeight;
+canvas.width=width;canvas.height=height;$('zoom').value='100';$('zoom-value').textContent='100%';
+$('stage').style.width=width+'px';$('stage').style.height=height+'px';photo.hidden=false;
+$('image-status').textContent='RGB preview loaded locally. Click Load for correction to verify the ZIP and unlock editing.';};
+photo.onerror=()=>{if(version!==selectionVersion)return;photo.hidden=true;$('image-status').textContent='RGB file could not be decoded. Select a valid PNG.';};
+photo.src=previewUrl;}
+$('rgb').addEventListener('change',previewRGB);
+$('archive').addEventListener('change',()=>{selectionVersion++;lockEditing();$('image-status').textContent='Original ZIP changed. Click Load for correction to verify it against the RGB.';});
 function point(e){const r=rect||canvas.getBoundingClientRect();return [Math.max(0,Math.min(width-1,Math.round((e.clientX-r.left)*width/r.width))),Math.max(0,Math.min(height-1,Math.round((e.clientY-r.top)*height/r.height)))];}
 function mark(path,color,radius){ctx.lineCap='round';ctx.lineJoin='round';ctx.strokeStyle=color;ctx.fillStyle=color;ctx.lineWidth=radius*2;ctx.beginPath();path.forEach(([x,y],i)=>i?ctx.lineTo(x,y):ctx.moveTo(x,y));ctx.stroke();for(const [x,y] of path){ctx.beginPath();ctx.arc(x,y,radius,0,Math.PI*2);ctx.fill();}}
 function replay(){if(!original)return;ctx.putImageData(original,0,0);for(const s of strokes){const c=colors[s.class_id];mark(s.points,s.class_id===0?'rgba(0,0,0,1)':`rgba(${c[0]},${c[1]},${c[2]},0.55)`,s.radius);}}
@@ -55,11 +69,21 @@ $('redo').onclick=()=>{if(active===null&&redo.length){strokes.push(redo.pop());r
 $('radius').oninput=()=>{$('radius-value').textContent=$('radius').value};
 $('zoom').oninput=()=>{const scale=Number($('zoom').value)/100;$('stage').style.width=(width*scale)+'px';$('stage').style.height=(height*scale)+'px';$('zoom-value').textContent=$('zoom').value+'%';};
 $('load').onclick=async()=>{if(!readyForLoad()){$('status').textContent='Choose the original annotation ZIP and its matching RGB PNG, then click Load.';return;}
-const body=new FormData();body.append('archive',source('archive'));body.append('rgb',source('rgb'));$('status').textContent='Validating source provenance...';
-try{const response=await fetch('/correction/prepare',{method:'POST',body});const payload=await response.json();if(!response.ok)throw Error(payload.error);
-const img=new Image();img.onerror=()=>{$('status').textContent='Unable to decode source RGB image in this browser.';};img.onload=()=>{$('photo').src=img.src;width=payload.width;height=payload.height;canvas.width=width;canvas.height=height;$('stage').style.width=width+'px';$('stage').style.height=height+'px';$('zoom').value=100;
-const mask=new Image();mask.onerror=()=>{$('status').textContent='Unable to decode annotation mask. Reload the page and try again.';};mask.onload=()=>{const tmp=document.createElement('canvas');tmp.width=width;tmp.height=height;const t=tmp.getContext('2d');t.drawImage(mask,0,0);const pixels=t.getImageData(0,0,width,height);const rgba=ctx.createImageData(width,height);for(let i=0;i<width*height;i++){const c=colors[pixels.data[4*i]]||colors[0];rgba.data.set(c,i*4);}original=rgba;strokes=[];redo=[];repaint();$('status').textContent='Image loaded and sources verified. Brush corrections can begin. Add matching depth + intrinsics only when exporting.';};mask.src='data:image/png;base64,'+payload.mask_preview_base64;};img.src='data:image/png;base64,'+payload.verified_rgb_base64;
-}catch(err){$('status').textContent='Error: '+err.message;}};
+const version=selectionVersion;lockEditing();const body=new FormData();body.append('archive',source('archive'));body.append('rgb',source('rgb'));$('status').textContent='Validating source provenance...';
+try{const response=await fetch('/correction/prepare',{method:'POST',body});const payload=await response.json();if(version!==selectionVersion)return;
+if(!response.ok)throw Error(payload.error||'Source validation failed');
+if($('photo').hidden)throw Error('RGB image did not decode locally. Please reselect the PNG.');
+if(width!==payload.width||height!==payload.height)throw Error('RGB dimensions do not match the annotation ZIP');
+const mask=new Image();mask.onerror=()=>{$('status').textContent='Annotation mask could not be decoded.';};
+mask.onload=()=>{if(version!==selectionVersion)return;try{const tmp=document.createElement('canvas');tmp.width=width;tmp.height=height;
+const t=tmp.getContext('2d');t.drawImage(mask,0,0);const pixels=t.getImageData(0,0,width,height);const rgba=ctx.createImageData(width,height);
+for(let i=0;i<width*height;i++){const c=colors[pixels.data[4*i]]||colors[0];rgba.data.set(c,i*4);}
+original=rgba;strokes=[];redo=[];repaint();$('status').textContent='Source verified. Brush corrections unlocked.';
+$('image-status').textContent='VERIFIED RGB + ANNOTATION — editing unlocked.';
+}catch(err){$('status').textContent='Mask preview error: '+err.message;}};
+mask.src='data:image/png;base64,'+payload.mask_preview_base64;
+}catch(err){$('status').textContent='Cannot unlock editing: '+err.message;
+$('image-status').textContent='RGB preview only — ZIP verification failed. '+err.message;}};
 $('export').onclick=async()=>{if(!original){$('status').textContent='Load the annotation ZIP and RGB first.';return;}
 if(!strokes.length){$('status').textContent='Make at least one correction before exporting.';return;}
 if(!readyForExport()){$('status').textContent='To export 3D, add matching depth PNG and camera_intrinsics.json.';return;}

@@ -118,6 +118,10 @@ calibration equality, stroke coordinates, and reviewer identifier. A reviewed
 dataset remains `HUMAN_REVIEWED_NOT_GROUND_TRUTH` until independently checked.
 The brush and zoom experience should be tested on the target laptop and in
 browser before claiming production-ready annotation ergonomics.
+The correction page previews an RGB PNG immediately after selection, before
+the annotation ZIP is verified. Drawing remains disabled until the server
+confirms the ZIP and original RGB SHA-256 match. A failed verification is
+reported adjacent to the preview; it must not be mistaken for a loaded mask.
 
 ### V0.7 / Correction coverage evidence
 
