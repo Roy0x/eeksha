@@ -16,9 +16,10 @@ button{background:#a1e9b0;color:#14281c;font-weight:bold;cursor:pointer}.minor{b
 #cloud{width:100%;height:530px;border:1px solid #456a50;margin-top:18px;background:#091316}
 @media(max-width:850px){main{grid-template-columns:1fr}}
 </style></head><body><header><h1>EEK<span style="color:#a1e9b0">SHA</span> / Human correction</h1></header><main>
-<section><h2>1 · Start with a clean scene</h2>
+<section><h2>1 · Open or resume a scene</h2>
 <label>RGB PNG<input id="rgb" type="file" accept="image/png"></label>
-<button id="load">Start blank annotation</button><p>All labels start UNKNOWN. No annotation ZIP is needed and no previous polygon labels are imported.</p><h2>2 · Paint semantic labels</h2>
+<label>Existing Eeksha dataset ZIP (optional)<input id="archive" type="file" accept=".zip,application/zip"></label>
+<button id="load">Load annotation</button><p>Without a ZIP, start from UNKNOWN. With an Eeksha export, resume its verified source mask and paint over existing classes. Keep the original ZIP for recovery.</p><h2>2 · Paint semantic labels</h2>
 <label>Tool / semantic class<select id="kind"><option value="4">Broccoli head</option><option value="5">Broccoli leaf</option><option value="1">Soil</option><option value="2">Other crop</option><option value="3">Weed</option><option value="0">Eraser / unknown</option></select></label>
 <label>Brush radius (source pixels) <output id="radius-value">8</output><input id="radius" type="range" min="1" max="40" value="8"></label>
 <label>Zoom <output id="zoom-value">100%</output><input id="zoom" type="range" min="50" max="400" step="25" value="100"></label>
@@ -35,10 +36,10 @@ button{background:#a1e9b0;color:#14281c;font-weight:bold;cursor:pointer}.minor{b
 <iframe id="cloud" title="Corrected 3D point-cloud preview" hidden></iframe></section></main>
 <script>
 const $=id=>document.getElementById(id),canvas=$('paint'),ctx=canvas.getContext('2d',{willReadFrequently:true});
-let width=0,height=0,original=null,strokes=[],redo=[],current=null,active=null,rect=null,previewUrl=null,selectionVersion=0,colors={0:[0,0,0,0],1:[186,133,83,140],2:[231,203,71,140],3:[233,87,87,140],4:[89,218,242,140],5:[127,238,122,140]};
+let width=0,height=0,original=null,strokes=[],redo=[],current=null,active=null,rect=null,previewUrl=null,selectionVersion=0,resumed=false,colors={0:[0,0,0,0],1:[186,133,83,140],2:[231,203,71,140],3:[233,87,87,140],4:[89,218,242,140],5:[127,238,122,140]};
 const source=(name)=>$(name).files[0];function readyForLoad(){return Boolean(source('rgb'));}
 function readyForExport(){return ['rgb','depth','calibration'].every(id=>source(id));}
-function lockEditing(){original=null;strokes=[];redo=[];ctx.clearRect(0,0,canvas.width,canvas.height);$('cloud').hidden=true;}
+function lockEditing(){original=null;strokes=[];redo=[];resumed=false;ctx.clearRect(0,0,canvas.width,canvas.height);$('cloud').hidden=true;}
 function previewRGB(){selectionVersion++;lockEditing();const file=source('rgb'),photo=$('photo');
 if(previewUrl){URL.revokeObjectURL(previewUrl);previewUrl=null;}photo.hidden=true;photo.removeAttribute('src');
 if(!file){$('image-status').textContent='Choose an RGB PNG to preview it.';return;}
@@ -50,6 +51,7 @@ $('image-status').textContent='RGB preview loaded. Click Start blank annotation 
 photo.onerror=()=>{if(version!==selectionVersion)return;photo.hidden=true;$('image-status').textContent='RGB file could not be decoded. Select a valid PNG.';};
 photo.src=previewUrl;}
 $('rgb').addEventListener('change',previewRGB);
+$('archive').addEventListener('change',()=>{selectionVersion++;lockEditing();$('image-status').textContent='Dataset selection changed. Click Load annotation to verify it.';});
 function point(e){const r=rect||canvas.getBoundingClientRect();return [Math.max(0,Math.min(width-1,Math.round((e.clientX-r.left)*width/r.width))),Math.max(0,Math.min(height-1,Math.round((e.clientY-r.top)*height/r.height)))];}
 function mark(path,color,radius){ctx.lineCap='round';ctx.lineJoin='round';ctx.strokeStyle=color;ctx.fillStyle=color;ctx.lineWidth=radius*2;ctx.beginPath();path.forEach(([x,y],i)=>i?ctx.lineTo(x,y):ctx.moveTo(x,y));ctx.stroke();for(const [x,y] of path){ctx.beginPath();ctx.arc(x,y,radius,0,Math.PI*2);ctx.fill();}}
 function replay(){if(!original)return;ctx.putImageData(original,0,0);for(const s of strokes){const c=colors[s.class_id];mark(s.points,s.class_id===0?'rgba(0,0,0,1)':`rgba(${c[0]},${c[1]},${c[2]},0.55)`,s.radius);}}
@@ -67,7 +69,7 @@ $('redo').onclick=()=>{if(active===null&&redo.length){strokes.push(redo.pop());r
 $('radius').oninput=()=>{$('radius-value').textContent=$('radius').value};
 $('zoom').oninput=()=>{const scale=Number($('zoom').value)/100;$('stage').style.width=(width*scale)+'px';$('stage').style.height=(height*scale)+'px';$('zoom-value').textContent=$('zoom').value+'%';};
 $('load').onclick=async()=>{if(!readyForLoad()){$('status').textContent='Choose an RGB PNG to start annotating.';return;}
-const version=selectionVersion;lockEditing();const body=new FormData();body.append('rgb',source('rgb'));$('status').textContent='Preparing a clean, all-UNKNOWN mask...';
+const version=selectionVersion;lockEditing();const body=new FormData();body.append('rgb',source('rgb'));if(source('archive'))body.append('archive',source('archive'));$('status').textContent='Verifying source and preparing mask...';
 try{const response=await fetch('/correction/prepare',{method:'POST',body});const payload=await response.json();if(version!==selectionVersion)return;
 if(!response.ok)throw Error(payload.error||'RGB preparation failed');
 if($('photo').hidden)throw Error('RGB image did not decode locally. Please reselect the PNG.');
@@ -76,8 +78,8 @@ const mask=new Image();mask.onerror=()=>{$('status').textContent='Annotation mas
 mask.onload=()=>{if(version!==selectionVersion)return;try{const tmp=document.createElement('canvas');tmp.width=width;tmp.height=height;
 const t=tmp.getContext('2d');t.drawImage(mask,0,0);const pixels=t.getImageData(0,0,width,height);const rgba=ctx.createImageData(width,height);
 for(let i=0;i<width*height;i++){const c=colors[pixels.data[4*i]]||colors[0];rgba.data.set(c,i*4);}
-original=rgba;strokes=[];redo=[];repaint();$('status').textContent='Blank mask ready. All pixels UNKNOWN until you paint them.';
-$('image-status').textContent='NEW ANNOTATION — no previous labels imported.';
+original=rgba;strokes=[];redo=[];resumed=payload.resumed;repaint();$('status').textContent=resumed?'Previous labels loaded. Paint corrections, then export a new ZIP.':'Blank mask ready. All pixels UNKNOWN until you paint them.';
+$('image-status').textContent=resumed?'RESUMED DATASET — existing label mask loaded.':'NEW ANNOTATION — all pixels UNKNOWN.';
 }catch(err){$('status').textContent='Mask preview error: '+err.message;}};
 mask.src='data:image/png;base64,'+payload.mask_preview_base64;
 }catch(err){$('status').textContent='Cannot start blank annotation: '+err.message;
@@ -85,7 +87,7 @@ $('image-status').textContent='RGB preview only — annotation preparation faile
 $('export').onclick=async()=>{if(!original){$('status').textContent='Choose RGB and click Start blank annotation first.';return;}
 if(!strokes.length){$('status').textContent='Make at least one correction before exporting.';return;}
 if(!readyForExport()){$('status').textContent='To export 3D, add matching depth PNG and camera_intrinsics.json.';return;}
-const body=new FormData();for(const id of ['rgb','depth','calibration'])body.append(id,source(id));body.append('strokes',JSON.stringify(strokes));body.append('reviewer',$('reviewer').value);
+const body=new FormData();for(const id of ['rgb','depth','calibration'])body.append(id,source(id));if(resumed&&source('archive'))body.append('archive',source('archive'));body.append('strokes',JSON.stringify(strokes));body.append('reviewer',$('reviewer').value);
 $('status').textContent='Rebuilding corrected 3D data...';try{const response=await fetch('/correction/export',{method:'POST',body});const data=await response.json();if(!response.ok)throw Error(data.error);
 const link=document.createElement('a');link.href='/download/'+data.id;link.textContent='Download human-labeled 3D ZIP';link.style.display='block';link.style.color='#a1e9b0';$('status').replaceChildren(document.createTextNode(data.changed_pixels+' pixels labeled. Unreviewed, not ground truth. '),link);
 const q=data.quality,head=q.classes.broccoli_head,regions=q.broccoli_head_regions;

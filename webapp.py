@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import io
 import base64
+import hashlib
 import json
 import tempfile
 import zipfile
@@ -17,7 +18,7 @@ from real_field_demo import convert_intrinsics
 from review import compare_exports, make_rgb_overlay
 from review_page import PAGE as REVIEW_PAGE
 from correction_page import PAGE as CORRECTION_PAGE
-from correction import apply_strokes, correct_mask, verify_source
+from correction import apply_strokes, verify_source, load_exported_mask
 from correction_quality import summarize_correction
 from review import load_annotation
 from eeksha import make_demo, process
@@ -69,12 +70,19 @@ def correction_prepare():
             if image.format != "PNG" or image.mode not in ("RGB", "RGBA") or image.width * image.height > 4_000_000:
                 raise ValueError("RGB must be an RGB/RGBA PNG with at most 4 million pixels")
             width, height = image.size
-        original = np.zeros((height, width), dtype=np.uint8)
+        archive_upload = request.files.get('archive')
+        if archive_upload and archive_upload.filename:
+            original, prior_report = load_exported_mask(archive_upload.read())
+            verify_source(rgb, prior_report['sources']['rgb'], 'RGB')
+            if original.shape != (height, width):
+                raise ValueError('Mask dimensions disagree with RGB')
+        else:
+            original = np.zeros((height, width), dtype=np.uint8)
         mask = io.BytesIO()
         Image.fromarray(original.astype("uint8")).save(mask, format="PNG")
     except (ValueError, OSError, UnidentifiedImageError) as exc:
         return {"error": str(exc)}, 422
-    return {"width": original.shape[1], "height": original.shape[0],
+    return {"width": original.shape[1], "height": original.shape[0], "resumed": bool(archive_upload and archive_upload.filename),
             "verified_rgb_base64": base64.b64encode(rgb).decode("ascii"),
             "mask_preview_base64": base64.b64encode(mask.getvalue()).decode("ascii")}
 
@@ -98,10 +106,14 @@ def correction_export():
             archive_upload = request.files.get("archive")
             archive = archive_upload.read() if archive_upload and archive_upload.filename else None
             if archive is not None:
-                original_labels, _, original_qa = load_annotation(archive)
+                original_labels, original_qa = load_exported_mask(archive)
                 verify_source(rgb, original_qa["sources"]["rgb"], "RGB")
                 verify_source(depth, original_qa["sources"]["depth"], "Depth")
-                labels, audit, _ = correct_mask(archive, strokes, request.form.get("reviewer", ""))
+                labels, audit = apply_strokes(original_labels, strokes, request.form.get("reviewer", ""))
+                audit.update({"provenance": "human_brush_correction",
+                              "review_status": "HUMAN_REVIEWED_NOT_GROUND_TRUTH",
+                              "original_annotation_sha256": hashlib.sha256(archive).hexdigest(),
+                              "original_label_sha256": original_qa['sources']['labels']['sha256']})
             else:
                 original_labels = np.zeros((height, width), dtype=np.uint8)
                 labels, audit = apply_strokes(original_labels, strokes, request.form.get("reviewer", ""))

@@ -4,6 +4,8 @@ from __future__ import annotations
 import hashlib
 import io
 import math
+import json
+import zipfile
 from PIL import Image, ImageDraw
 import numpy as np
 
@@ -70,3 +72,39 @@ def apply_strokes(original: np.ndarray, strokes: list, reviewer: str) -> tuple[I
 def verify_source(data: bytes, source: dict, name: str) -> None:
     if not data or hashlib.sha256(data).hexdigest() != source["sha256"]:
         raise ValueError(f"{name} SHA-256 does not match original annotation source")
+
+
+def load_exported_mask(archive_bytes: bytes) -> tuple[np.ndarray, dict]:
+    """Load polygon or brush-export labels, requiring matching recorded mask hash."""
+    if not archive_bytes or len(archive_bytes) > 30 * 1024 * 1024:
+        raise ValueError("Eeksha dataset ZIP must be under 30 MB")
+    try:
+        with zipfile.ZipFile(io.BytesIO(archive_bytes)) as archive:
+            members = archive.infolist()
+            names = [item.filename for item in members]
+            if len(names) != len(set(names)) or not {'labels.png', 'qa_report.json'} <= set(names):
+                raise ValueError("Missing or duplicate required ZIP entries")
+            if len(members) > 32 or sum(item.file_size for item in members) > 50 * 1024 * 1024:
+                raise ValueError("Dataset ZIP exceeds extraction limits")
+            labels_data = archive.read('labels.png')
+            report = json.loads(archive.read('qa_report.json'))
+            if 'annotations.json' in names:
+                labels, _, _ = load_annotation(archive_bytes)
+            else:
+                with Image.open(io.BytesIO(labels_data)) as im:
+                    if im.mode not in ('L', 'P') or im.width * im.height > 4_000_000:
+                        raise ValueError('Unsupported label mask')
+                    labels = np.asarray(im).copy()
+                if not np.isin(labels, list(CLASSES)).all():
+                    raise ValueError('Unexpected semantic class IDs')
+    except (zipfile.BadZipFile, OSError, KeyError, TypeError, json.JSONDecodeError) as exc:
+        raise ValueError('Invalid Eeksha dataset ZIP') from exc
+    sources = report.get('sources') if isinstance(report, dict) else None
+    if not isinstance(sources, dict) or sources.get('labels', {}).get('sha256') != hashlib.sha256(labels_data).hexdigest():
+        raise ValueError('Label mask does not match QA SHA-256')
+    for key in ('rgb', 'depth'):
+        if not isinstance(sources.get(key, {}).get('sha256'), str):
+            raise ValueError(f'Missing {key} source hash')
+    if not isinstance(report.get('calibration'), dict):
+        raise ValueError('Missing calibration metadata')
+    return labels, report

@@ -110,7 +110,7 @@ class CorrectionTests(unittest.TestCase):
             page = response.data.decode("utf-8")
             self.assertIn("function readyForLoad(){return Boolean(source('rgb'));}", page)
             self.assertIn("function readyForExport()", page)
-            self.assertNotIn('id="archive"', page)
+            self.assertIn('id="archive"', page)
             self.assertIn("Blank mask ready", page)
             self.assertIn("previewRGB", page)
 
@@ -142,6 +142,49 @@ class CorrectionTests(unittest.TestCase):
                     arr = np.asarray(labels)
                 self.assertEqual(int(arr[4, 4]), 4)
                 self.assertEqual(int(arr[9, 9]), 0)
+
+    def test_resume_brush_export_preserves_existing_labels(self):
+        rgb, depth = io.BytesIO(), io.BytesIO()
+        Image.fromarray(np.zeros((10, 10, 3), dtype=np.uint8)).save(rgb, 'PNG')
+        Image.fromarray(np.full((10, 10), 800, dtype=np.uint16)).save(depth, 'PNG')
+        calibration = {"resolution": {"width": 10, "height": 10},
+                       "rgb_intrinsics": {"fx": 10, "fy": 10, "cx": 4.5, "cy": 4.5,
+                                          "distortion_coefficients": [0, 0, 0, 0, 0]},
+                       "usage_notes": {"depth_alignment": "Depth aligned to the RGB image",
+                                       "coordinate_formula": "Z is depth in mm"}}
+        with APP.test_client() as client:
+            base = client.post('/correction/export', data={
+                'rgb': (io.BytesIO(rgb.getvalue()), 'rgb.png'),
+                'depth': (io.BytesIO(depth.getvalue()), 'depth.png'),
+                'calibration': (io.BytesIO(json.dumps(calibration).encode()), 'camera_intrinsics.json'),
+                'strokes': json.dumps([{'class_id': 4, 'radius': 2, 'points': [[3, 3]]}]),
+                'reviewer': 'tester'})
+            self.assertEqual(base.status_code, 200, base.json)
+            original = client.get('/download/' + base.json['id']).data
+            loaded = client.post('/correction/prepare', data={
+                'archive': (io.BytesIO(original), 'old.zip'),
+                'rgb': (io.BytesIO(rgb.getvalue()), 'rgb.png')})
+            self.assertEqual(loaded.status_code, 200, loaded.json)
+            self.assertTrue(loaded.json['resumed'])
+            bad_rgb = io.BytesIO()
+            Image.fromarray(np.ones((10, 10, 3), dtype=np.uint8)).save(bad_rgb, 'PNG')
+            wrong = client.post('/correction/prepare', data={
+                'archive': (io.BytesIO(original), 'old.zip'),
+                'rgb': (io.BytesIO(bad_rgb.getvalue()), 'wrong.png')})
+            self.assertEqual(wrong.status_code, 422)
+            updated = client.post('/correction/export', data={
+                'archive': (io.BytesIO(original), 'old.zip'),
+                'rgb': (io.BytesIO(rgb.getvalue()), 'rgb.png'),
+                'depth': (io.BytesIO(depth.getvalue()), 'depth.png'),
+                'calibration': (io.BytesIO(json.dumps(calibration).encode()), 'camera_intrinsics.json'),
+                'strokes': json.dumps([{'class_id': 4, 'radius': 1, 'points': [[8, 8]]}]),
+                'reviewer': 'tester'})
+            self.assertEqual(updated.status_code, 200, updated.json)
+            with zipfile.ZipFile(io.BytesIO(client.get('/download/' + updated.json['id']).data)) as saved:
+                labels = np.asarray(Image.open(io.BytesIO(saved.read('labels.png'))))
+                self.assertEqual(int(labels[3, 3]), 4)
+                self.assertEqual(int(labels[8, 8]), 4)
+                self.assertEqual(saved.read('original_annotation.zip'), original)
 
 
 if __name__ == "__main__":
