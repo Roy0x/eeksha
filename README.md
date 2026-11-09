@@ -132,6 +132,14 @@ the broccoli-head comparison and an embedded corrected 3D viewer after export.
 These metrics establish completeness/coverage only, not label correctness or
 geometric accuracy. The original ZIP and correction strokes remain auditable.
 
+### Per-region review flags
+
+`correction_quality.json` now lists significant 8-connected broccoli-head mask
+regions, with bounding boxes, image pixel count, points with valid depth, and
+valid-depth fraction. Regions with less than 25% valid depth or touching an
+image border are flagged for review. Connected regions are **not** verified
+object instances, and the flags never automatically certify or reject a label.
+
 The WE3DS authors report stereo calibration **per measurement date**, followed by
 rectification and cropping to 1600x1144. The public dataset card describes the
 camera setup, but does not provide the exact effective rectified/cropped intrinsics

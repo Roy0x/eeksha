@@ -47,6 +47,19 @@ class CorrectionTests(unittest.TestCase):
         self.assertEqual(q["classes"]["broccoli_head"]["after_valid_3d_points"], 2)
         self.assertFalse(q["ground_truth_verified"])
 
+    def test_head_regions_flags_low_depth_and_border(self):
+        from correction_quality import head_regions
+        head = np.zeros((16, 16), dtype=bool)
+        head[0:6, 0:6] = True
+        head[9:15, 9:15] = True
+        valid = np.zeros_like(head)
+        valid[9:15, 9:15] = True
+        result = head_regions(head, valid)
+        self.assertEqual(result["significant_region_count"], 2)
+        self.assertIn("LOW_VALID_DEPTH_COVERAGE", result["regions"][0]["flags"])
+        self.assertIn("TOUCHES_IMAGE_BORDER", result["regions"][0]["flags"])
+        self.assertEqual(result["regions"][1]["valid_depth_fraction"], 1.0)
+
     def test_reviewed_3d_export(self):
         rgb = io.BytesIO()
         depth = io.BytesIO()
