@@ -7,6 +7,7 @@ import json
 import tempfile
 import zipfile
 from pathlib import Path
+import numpy as np
 
 from flask import Flask, Response, abort, render_template_string, request, send_file
 from PIL import UnidentifiedImageError, Image
@@ -17,6 +18,7 @@ from review import compare_exports, make_rgb_overlay
 from review_page import PAGE as REVIEW_PAGE
 from correction_page import PAGE as CORRECTION_PAGE
 from correction import correct_mask, verify_source
+from correction_quality import summarize_correction
 from review import load_annotation
 from eeksha import make_demo, process
 from viewer import generate_viewer
@@ -87,6 +89,7 @@ def correction_export():
         archive = request.files["archive"].read()
         strokes = json.loads(request.form.get("strokes", "null"))
         labels, audit, original_qa = correct_mask(archive, strokes, request.form.get("reviewer", ""))
+        original_labels, _, _ = load_annotation(archive)
         with tempfile.TemporaryDirectory() as temp:
             folder = Path(temp)
             rgb = request.files["rgb"].read()
@@ -101,9 +104,14 @@ def correction_export():
             report, viewer_html, standard_archive = build_run(folder, synthetic=False)
             if report["calibration"] != original_qa["calibration"]:
                 raise ValueError("Camera calibration does not match original annotation")
+            with Image.open(folder / "depth.png") as depth_image:
+                quality = summarize_correction(original_labels, labels, np.asarray(depth_image),
+                                               float(report["calibration"]["depth_scale"]),
+                                               float(report["max_depth_m"]))
             report["annotation_provenance"] = audit["provenance"]
             report["annotation_review"] = audit["review_status"]
             report["labels_predicted_by_ai"] = False
+            report["correction_quality"] = quality
             output = io.BytesIO()
             with zipfile.ZipFile(output, "w", zipfile.ZIP_DEFLATED) as zipped:
                 with zipfile.ZipFile(io.BytesIO(standard_archive)) as original:
@@ -111,13 +119,14 @@ def correction_export():
                         zipped.writestr(filename, json.dumps(report, indent=2) if filename == "qa_report.json"
                                         else original.read(filename))
                 zipped.writestr("correction_audit.json", json.dumps(audit, indent=2))
+                zipped.writestr("correction_quality.json", json.dumps(quality, indent=2))
                 zipped.writestr("original_annotation.zip", archive)
     except (ValueError, TypeError, KeyError, OSError, json.JSONDecodeError, UnidentifiedImageError) as exc:
         return {"error": str(exc)}, 422
     token = uuid4().hex
     RUNS.clear()
     RUNS[token] = {"report": report, "viewer": viewer_html, "archive": output.getvalue()}
-    return {"id": token, "changed_pixels": audit["changed_pixels"],
+    return {"id": token, "changed_pixels": audit["changed_pixels"], "quality": quality,
             "review_status": audit["review_status"], "ground_truth_verified": False}
 
 

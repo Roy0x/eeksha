@@ -8,6 +8,7 @@ import numpy as np
 from PIL import Image
 
 from correction import correct_mask
+from correction_quality import summarize_correction
 from test_review import make_export
 from webapp import APP
 
@@ -34,6 +35,17 @@ class CorrectionTests(unittest.TestCase):
                        {"class_id": 99, "radius": 2, "points": [[3, 3]]}):
             with self.assertRaises(ValueError):
                 correct_mask(original, [stroke], "human-01")
+
+    def test_quality_counts_valid_and_missing_depth(self):
+        before = np.array([[4, 4, 0], [0, 0, 0]], dtype=np.uint8)
+        after = Image.fromarray(np.array([[4, 0, 4], [0, 0, 0]], dtype=np.uint8))
+        depth = np.array([[800, 0, 900], [0, 0, 0]], dtype=np.uint16)
+        q = summarize_correction(before, after, depth, 0.001, 5.0)
+        self.assertEqual(q["changed_pixels"], 2)
+        self.assertEqual(q["changed_pixels_with_valid_depth"], 1)
+        self.assertEqual(q["changed_pixels_without_valid_depth"], 1)
+        self.assertEqual(q["classes"]["broccoli_head"]["after_valid_3d_points"], 2)
+        self.assertFalse(q["ground_truth_verified"])
 
     def test_reviewed_3d_export(self):
         rgb = io.BytesIO()
@@ -73,6 +85,10 @@ class CorrectionTests(unittest.TestCase):
                 self.assertEqual(audit["reviewer"], "manoj")
                 self.assertEqual(zipped.read("original_annotation.zip"), archive)
                 self.assertIn("semantic_cloud.ply", zipped.namelist())
+                quality = json.loads(zipped.read("correction_quality.json"))
+                self.assertEqual(quality["changed_pixels"], audit["changed_pixels"])
+                self.assertEqual(quality["total_valid_depth_pixels"], 100)
+                self.assertFalse(quality["ground_truth_verified"])
 
     def test_load_form_only_requires_zip_and_rgb(self):
         with APP.test_client() as client:

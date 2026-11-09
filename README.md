@@ -119,6 +119,15 @@ dataset remains `HUMAN_REVIEWED_NOT_GROUND_TRUTH` until independently checked.
 The brush and zoom experience should be tested on the target laptop and in
 browser before claiming production-ready annotation ergonomics.
 
+### V0.7 / Correction coverage evidence
+
+Corrected exports include `correction_quality.json`, with original/corrected
+pixel counts, valid-depth point counts for every semantic class, and the number
+of changed image pixels that have no usable depth. The correction page shows
+the broccoli-head comparison and an embedded corrected 3D viewer after export.
+These metrics establish completeness/coverage only, not label correctness or
+geometric accuracy. The original ZIP and correction strokes remain auditable.
+
 The WE3DS authors report stereo calibration **per measurement date**, followed by
 rectification and cropping to 1600x1144. The public dataset card describes the
 camera setup, but does not provide the exact effective rectified/cropped intrinsics

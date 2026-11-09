@@ -11,6 +11,8 @@ button{background:#a1e9b0;color:#14281c;font-weight:bold;cursor:pointer}.minor{b
 #stage{position:relative;width:640px;height:480px;line-height:0;transform-origin:top left}
 #photo,#paint{position:absolute;inset:0;width:100%;height:100%}#paint{touch-action:none;cursor:crosshair}
 #status{white-space:pre-wrap;color:#c5dcc9}p{color:#c1d3c6;line-height:1.5}a{color:#a1e9b0}
+#qa{white-space:pre-wrap;color:#d4ead9;line-height:1.7;border-left:3px solid #a1e9b0;padding-left:12px}
+#cloud{width:100%;height:530px;border:1px solid #456a50;margin-top:18px;background:#091316}
 @media(max-width:850px){main{grid-template-columns:1fr}}
 </style></head><body><header><h1>EEK<span style="color:#a1e9b0">SHA</span> / Human correction</h1></header><main>
 <section><h2>1 · Open original annotations</h2>
@@ -26,9 +28,11 @@ button{background:#a1e9b0;color:#14281c;font-weight:bold;cursor:pointer}.minor{b
 <label>Original camera_intrinsics.json<input id="calibration" type="file" accept=".json"></label>
 <label>Reviewer identifier<input id="reviewer" maxlength="80" placeholder="Your name or reviewer ID"></label>
 <button id="export">Export reviewed 3D dataset</button><p id="status" role="status">Load the original ZIP and source files.</p>
+<h3>Correction quality report</h3><div id="qa">Export to see before/after metrics.</div>
 <a href="/review">Comparison</a> · <a href="/annotator">Annotation</a>
 </section><section><h2>Source RGB + editable class mask</h2><div id="viewport"><div id="stage"><img id="photo" alt="verified RGB"><canvas id="paint" width="640" height="480"></canvas></div></div>
-<p>Corrections are human-made. Eraser restores UNKNOWN. Undo/redo and pan by scrolling when zoomed. A reviewed export is not independently verified ground truth.</p></section></main>
+<p>Corrections are human-made. Eraser restores UNKNOWN. Undo/redo and pan by scrolling when zoomed. A reviewed export is not independently verified ground truth.</p>
+<iframe id="cloud" title="Corrected 3D point-cloud preview" hidden></iframe></section></main>
 <script>
 const $=id=>document.getElementById(id),canvas=$('paint'),ctx=canvas.getContext('2d',{willReadFrequently:true});
 let width=0,height=0,original=null,strokes=[],redo=[],current=null,active=null,rect=null,colors={0:[0,0,0,0],1:[186,133,83,140],2:[231,203,71,140],3:[233,87,87,140],4:[89,218,242,140],5:[127,238,122,140]};
@@ -62,5 +66,8 @@ if(!readyForExport()){$('status').textContent='To export 3D, add matching depth 
 const body=new FormData();for(const id of ['archive','rgb','depth','calibration'])body.append(id,source(id));body.append('strokes',JSON.stringify(strokes));body.append('reviewer',$('reviewer').value);
 $('status').textContent='Rebuilding corrected 3D data...';try{const response=await fetch('/correction/export',{method:'POST',body});const data=await response.json();if(!response.ok)throw Error(data.error);
 const link=document.createElement('a');link.href='/download/'+data.id;link.textContent='Download human-reviewed 3D ZIP';link.style.display='block';link.style.color='#a1e9b0';$('status').replaceChildren(document.createTextNode(data.changed_pixels+' mask pixels changed. Reviewed, not ground truth. '),link);
+const q=data.quality,head=q.classes.broccoli_head;
+$('qa').textContent=`Edited image pixels: ${q.changed_pixels.toLocaleString()}\nEdits with valid 3D depth: ${q.changed_pixels_with_valid_depth.toLocaleString()}\nEdits without valid depth: ${q.changed_pixels_without_valid_depth.toLocaleString()}\nBroccoli-head pixels: ${head.before_pixels.toLocaleString()} → ${head.after_pixels.toLocaleString()}\nBroccoli-head valid 3D points: ${head.before_valid_3d_points.toLocaleString()} → ${head.after_valid_3d_points.toLocaleString()}\nStatus: ${q.status} — NOT VERIFIED GROUND TRUTH`;
+const cloud=$('cloud');cloud.src='/viewer/'+data.id;cloud.hidden=false;
 }catch(err){$('status').textContent='Error: '+err.message;}};
 </script></body></html>'''
