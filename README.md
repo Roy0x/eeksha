@@ -106,22 +106,41 @@ or ground truth. Annotator identity and independence are not authenticated.
 To make a genuine quality claim, recruit a second annotator and have a reviewer
 resolve the colored disagreement regions before issuing an approved dataset.
 
-### V0.6 / Human brush correction and auditable 3D re-export
+### Human brush annotation, ZIP resume and auditable 3D re-export
 
-Open `http://127.0.0.1:8012/correct`. Select the RGB PNG and click
-**Start blank annotation**. Every pixel starts as UNKNOWN. The browser editor
-no longer requires or imports any older annotation ZIP. Paint new semantic
+Open `http://127.0.0.1:8012/correct`. Select the RGB PNG. Optionally select
+an Eeksha dataset export ZIP and click **Load annotation** to resume its existing
+class mask, or leave the ZIP blank to start from UNKNOWN. Resumed labels are
+accepted only when their recorded SHA-256 and source RGB match; the export
+also checks source depth and calibration. Paint new semantic
 classes, use `Eraser / unknown`, and undo/redo strokes. For 3D export, provide
 matching RGB/depth PNGs, original `camera_intrinsics.json`, and reviewer ID.
 The package contains `labels.png`, corresponding 3D PLY/NPZ and an auditable
-`correction_audit.json`. New brush labeling is marked `UNREVIEWED`, not ground
-truth. The original ZIP-based correction functions remain available to older
-clients, but are not exposed on the new annotation page.
+`correction_audit.json`. Resumed corrections also retain the original dataset
+ZIP in `original_annotation.zip`. New brush labeling is marked `UNREVIEWED`,
+and resumed brush corrections are marked human-reviewed, **not ground truth**.
 The brush and zoom experience should be tested on the target laptop and in
 browser before claiming production-ready annotation ergonomics.
 The correction page previews an RGB PNG immediately after selection. Drawing
-remains disabled until a fresh blank label mask is initialized. A failed image
+remains disabled until the initial label mask is initialized. A failed image
 decode is displayed beside the preview.
+
+#### Reproducible broccoli-scene smoke test
+
+With the original field RGB, depth, camera intrinsics and a previously exported
+Eeksha dataset ZIP available locally, run:
+
+```bash
+python scripts/smoke_resume_export.py original.zip day_rgb_0001.png day_depth_0001.png camera_intrinsics.json corrected-review-candidate.zip
+```
+
+This tests ZIP resume, erases the specific suspect right-edge component in the
+November 2026 broccoli sample (center pixel 604,155), verifies that four
+significant head-mask regions remain, checks the new PLY/NPZ/QA archive and
+preserves the original ZIP inside the new export. It is a **sample-specific
+regression test**, not a generic automatic object detector. The resulting
+dataset is an inspectable review candidate; labels and depth geometry are
+not independently validated.
 
 ### V0.7 / Correction coverage evidence
 
