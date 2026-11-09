@@ -13,6 +13,17 @@ from review import load_annotation
 
 def correct_mask(archive: bytes, strokes: list, reviewer: str) -> tuple[Image.Image, dict, dict]:
     original, metadata, qa = load_annotation(archive)
+    mask, provenance = apply_strokes(original, strokes, reviewer)
+    provenance.update({"provenance": "human_brush_correction",
+                       "review_status": "HUMAN_REVIEWED_NOT_GROUND_TRUTH",
+                       "original_annotation_sha256": hashlib.sha256(archive).hexdigest(),
+                       "original_annotation_provenance": metadata["provenance"],
+                       "original_label_sha256": qa["sources"]["labels"]["sha256"]})
+    return mask, provenance, qa
+
+
+def apply_strokes(original: np.ndarray, strokes: list, reviewer: str) -> tuple[Image.Image, dict]:
+    """Replay human brush actions over an explicit starting mask (including all-unknown)."""
     if not isinstance(reviewer, str) or not 2 <= len(reviewer.strip()) <= 80:
         raise ValueError("Reviewer name or identifier must contain 2–80 characters")
     if not isinstance(strokes, list) or not 1 <= len(strokes) <= 1000:
@@ -47,15 +58,13 @@ def correct_mask(archive: bytes, strokes: list, reviewer: str) -> tuple[Image.Im
     changed = int(np.count_nonzero(np.asarray(mask) != original))
     if changed == 0:
         raise ValueError("Corrections did not change any labeled pixels")
-    provenance = {"provenance": "human_brush_correction", "review_status": "HUMAN_REVIEWED_NOT_GROUND_TRUTH",
-                  "reviewer": reviewer.strip(), "original_annotation_sha256": hashlib.sha256(archive).hexdigest(),
-                  "original_annotation_provenance": metadata["provenance"],
-                  "original_label_sha256": qa["sources"]["labels"]["sha256"],
+    provenance = {"provenance": "human_brush_annotation", "review_status": "UNREVIEWED",
+                  "reviewer": reviewer.strip(),
                   "image_width": width, "image_height": height,
                   "changed_pixels": changed, "strokes": audit,
                   "ground_truth_verified": False,
-                  "limitations": ["Human corrections are not independently verified ground truth"]}
-    return mask, provenance, qa
+                  "limitations": ["Human brush labels are not independently reviewed ground truth"]}
+    return mask, provenance
 
 
 def verify_source(data: bytes, source: dict, name: str) -> None:

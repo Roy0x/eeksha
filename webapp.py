@@ -17,7 +17,7 @@ from real_field_demo import convert_intrinsics
 from review import compare_exports, make_rgb_overlay
 from review_page import PAGE as REVIEW_PAGE
 from correction_page import PAGE as CORRECTION_PAGE
-from correction import correct_mask, verify_source
+from correction import apply_strokes, correct_mask, verify_source
 from correction_quality import summarize_correction
 from review import load_annotation
 from eeksha import make_demo, process
@@ -61,15 +61,15 @@ def correction_page():
 
 @APP.post("/correction/prepare")
 def correction_prepare():
-    if any(name not in request.files or not request.files[name].filename for name in ("archive", "rgb")):
-        return {"error": "Upload original annotation ZIP and exact RGB PNG"}, 400
+    if "rgb" not in request.files or not request.files["rgb"].filename:
+        return {"error": "Upload an RGB PNG"}, 400
     try:
-        original, metadata, qa = load_annotation(request.files["archive"].read())
         rgb = request.files["rgb"].read()
-        verify_source(rgb, qa["sources"]["rgb"], "RGB")
         with Image.open(io.BytesIO(rgb)) as image:
-            if image.format != "PNG" or image.mode not in ("RGB", "RGBA") or image.size != (original.shape[1], original.shape[0]):
-                raise ValueError("Source RGB PNG dimensions or format do not match annotation")
+            if image.format != "PNG" or image.mode not in ("RGB", "RGBA") or image.width * image.height > 4_000_000:
+                raise ValueError("RGB must be an RGB/RGBA PNG with at most 4 million pixels")
+            width, height = image.size
+        original = np.zeros((height, width), dtype=np.uint8)
         mask = io.BytesIO()
         Image.fromarray(original.astype("uint8")).save(mask, format="PNG")
     except (ValueError, OSError, UnidentifiedImageError) as exc:
@@ -83,26 +83,35 @@ def correction_prepare():
 def correction_export():
     from uuid import uuid4
     if any(name not in request.files or not request.files[name].filename
-           for name in ("archive", "rgb", "depth", "calibration")):
-        return {"error": "Upload the original ZIP, RGB, depth, and camera intrinsics"}, 400
+           for name in ("rgb", "depth", "calibration")):
+        return {"error": "Upload RGB, depth, and camera intrinsics"}, 400
     try:
-        archive = request.files["archive"].read()
         strokes = json.loads(request.form.get("strokes", "null"))
-        labels, audit, original_qa = correct_mask(archive, strokes, request.form.get("reviewer", ""))
-        original_labels, _, _ = load_annotation(archive)
         with tempfile.TemporaryDirectory() as temp:
             folder = Path(temp)
             rgb = request.files["rgb"].read()
             depth = request.files["depth"].read()
-            verify_source(rgb, original_qa["sources"]["rgb"], "RGB")
-            verify_source(depth, original_qa["sources"]["depth"], "Depth")
+            with Image.open(io.BytesIO(rgb)) as image:
+                if image.format != "PNG" or image.mode not in ("RGB", "RGBA") or image.width * image.height > 4_000_000:
+                    raise ValueError("RGB must be an RGB/RGBA PNG with at most 4 million pixels")
+                width, height = image.size
+            archive_upload = request.files.get("archive")
+            archive = archive_upload.read() if archive_upload and archive_upload.filename else None
+            if archive is not None:
+                original_labels, _, original_qa = load_annotation(archive)
+                verify_source(rgb, original_qa["sources"]["rgb"], "RGB")
+                verify_source(depth, original_qa["sources"]["depth"], "Depth")
+                labels, audit, _ = correct_mask(archive, strokes, request.form.get("reviewer", ""))
+            else:
+                original_labels = np.zeros((height, width), dtype=np.uint8)
+                labels, audit = apply_strokes(original_labels, strokes, request.form.get("reviewer", ""))
             (folder / "rgb.png").write_bytes(rgb)
             (folder / "depth.png").write_bytes(depth)
             (folder / "camera_intrinsics.json").write_bytes(request.files["calibration"].read())
             convert_intrinsics(folder / "camera_intrinsics.json", folder / "calibration.json")
             labels.save(folder / "labels.png")
             report, viewer_html, standard_archive = build_run(folder, synthetic=False)
-            if report["calibration"] != original_qa["calibration"]:
+            if archive is not None and report["calibration"] != original_qa["calibration"]:
                 raise ValueError("Camera calibration does not match original annotation")
             with Image.open(folder / "depth.png") as depth_image:
                 quality = summarize_correction(original_labels, labels, np.asarray(depth_image),
@@ -118,9 +127,12 @@ def correction_export():
                     for filename in original.namelist():
                         zipped.writestr(filename, json.dumps(report, indent=2) if filename == "qa_report.json"
                                         else original.read(filename))
+                zipped.write(folder / "labels.png", "labels.png")
+                zipped.write(folder / "camera_intrinsics.json", "camera_intrinsics.json")
                 zipped.writestr("correction_audit.json", json.dumps(audit, indent=2))
                 zipped.writestr("correction_quality.json", json.dumps(quality, indent=2))
-                zipped.writestr("original_annotation.zip", archive)
+                if archive is not None:
+                    zipped.writestr("original_annotation.zip", archive)
     except (ValueError, TypeError, KeyError, OSError, json.JSONDecodeError, UnidentifiedImageError) as exc:
         return {"error": str(exc)}, 422
     token = uuid4().hex

@@ -90,16 +90,45 @@ class CorrectionTests(unittest.TestCase):
                 self.assertEqual(quality["total_valid_depth_pixels"], 100)
                 self.assertFalse(quality["ground_truth_verified"])
 
-    def test_load_form_only_requires_zip_and_rgb(self):
+    def test_blank_annotation_form_needs_no_zip(self):
         with APP.test_client() as client:
             response = client.get("/correct")
             self.assertEqual(response.status_code, 200)
             page = response.data.decode("utf-8")
-            self.assertIn("function readyForLoad(){return source('archive')&&source('rgb');}", page)
+            self.assertIn("function readyForLoad(){return Boolean(source('rgb'));}", page)
             self.assertIn("function readyForExport()", page)
-            self.assertIn("RGB preview loaded locally", page)
-            self.assertIn("Brush corrections unlocked", page)
+            self.assertNotIn('id="archive"', page)
+            self.assertIn("Blank mask ready", page)
             self.assertIn("previewRGB", page)
+
+    def test_start_blank_and_export_without_annotation_zip(self):
+        rgb, depth = io.BytesIO(), io.BytesIO()
+        Image.fromarray(np.zeros((10, 10, 3), dtype=np.uint8)).save(rgb, "PNG")
+        Image.fromarray(np.full((10, 10), 800, dtype=np.uint16)).save(depth, "PNG")
+        calibration = {"resolution": {"width": 10, "height": 10},
+                       "rgb_intrinsics": {"fx": 10, "fy": 10, "cx": 4.5, "cy": 4.5,
+                                          "distortion_coefficients": [0, 0, 0, 0, 0]},
+                       "usage_notes": {"depth_alignment": "Depth aligned to the RGB image",
+                                       "coordinate_formula": "Z is depth in mm"}}
+        with APP.test_client() as client:
+            prep = client.post("/correction/prepare", data={"rgb": (io.BytesIO(rgb.getvalue()), "rgb.png")})
+            self.assertEqual(prep.status_code, 200, prep.json)
+            result = client.post("/correction/export", data={
+                "rgb": (io.BytesIO(rgb.getvalue()), "rgb.png"),
+                "depth": (io.BytesIO(depth.getvalue()), "depth.png"),
+                "calibration": (io.BytesIO(json.dumps(calibration).encode()), "camera_intrinsics.json"),
+                "strokes": json.dumps([{"class_id": 4, "radius": 2, "points": [[4, 4]]}]),
+                "reviewer": "manoj"})
+            self.assertEqual(result.status_code, 200, result.json)
+            self.assertEqual(result.json["review_status"], "UNREVIEWED")
+            with zipfile.ZipFile(io.BytesIO(client.get("/download/" + result.json["id"]).data)) as zipped:
+                self.assertNotIn("original_annotation.zip", zipped.namelist())
+                self.assertEqual(json.loads(zipped.read("correction_audit.json"))["provenance"],
+                                 "human_brush_annotation")
+                with Image.open(io.BytesIO(zipped.read("labels.png"))) as labels:
+                    arr = np.asarray(labels)
+                self.assertEqual(int(arr[4, 4]), 4)
+                self.assertEqual(int(arr[9, 9]), 0)
 
 
 if __name__ == "__main__":

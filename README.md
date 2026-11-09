@@ -108,20 +108,20 @@ resolve the colored disagreement regions before issuing an approved dataset.
 
 ### V0.6 / Human brush correction and auditable 3D re-export
 
-Open `http://127.0.0.1:8012/correct`. Upload an original annotation ZIP, its
-exact RGB and depth PNG files, and the original `camera_intrinsics.json`.
-Use the brush or the `Eraser / unknown` class, zoom for precision, and undo/redo
-strokes. The original annotation is not modified; export generates new corrected
-labels and corresponding 3D PLY/NPZ, plus `correction_audit.json` and a copy
-of the original annotation ZIP. The server validates source RGB/depth SHA-256,
-calibration equality, stroke coordinates, and reviewer identifier. A reviewed
-dataset remains `HUMAN_REVIEWED_NOT_GROUND_TRUTH` until independently checked.
+Open `http://127.0.0.1:8012/correct`. Select the RGB PNG and click
+**Start blank annotation**. Every pixel starts as UNKNOWN. The browser editor
+no longer requires or imports any older annotation ZIP. Paint new semantic
+classes, use `Eraser / unknown`, and undo/redo strokes. For 3D export, provide
+matching RGB/depth PNGs, original `camera_intrinsics.json`, and reviewer ID.
+The package contains `labels.png`, corresponding 3D PLY/NPZ and an auditable
+`correction_audit.json`. New brush labeling is marked `UNREVIEWED`, not ground
+truth. The original ZIP-based correction functions remain available to older
+clients, but are not exposed on the new annotation page.
 The brush and zoom experience should be tested on the target laptop and in
 browser before claiming production-ready annotation ergonomics.
-The correction page previews an RGB PNG immediately after selection, before
-the annotation ZIP is verified. Drawing remains disabled until the server
-confirms the ZIP and original RGB SHA-256 match. A failed verification is
-reported adjacent to the preview; it must not be mistaken for a loaded mask.
+The correction page previews an RGB PNG immediately after selection. Drawing
+remains disabled until a fresh blank label mask is initialized. A failed image
+decode is displayed beside the preview.
 
 ### V0.7 / Correction coverage evidence
 
