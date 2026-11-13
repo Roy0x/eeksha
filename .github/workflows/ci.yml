@@ -1,0 +1,40 @@
+name: Eeksha CI
+
+on:
+  push:
+    branches: [main, "feat/**"]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test-and-smoke:
+    name: Python ${{ matrix.python-version }} tests and synthetic export
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: requirements.txt
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Unit tests
+        run: python -m unittest -v
+      - name: Synthetic end-to-end smoke test
+        shell: bash
+        run: |
+          set -euo pipefail
+          workdir="$(mktemp -d)"
+          trap 'rm -rf "$workdir"' EXIT
+          python run.py --demo --input "$workdir/input" --output "$workdir/output"
+          python scripts/verify_demo_export.py "$workdir/output"
