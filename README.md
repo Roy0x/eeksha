@@ -1,4 +1,12 @@
-# Eeksha MVP
+# Eeksha AI — agricultural spatial data research preview
+
+**Public preview target:** November 30, 2026. The company/brand is **Eeksha AI**; the current local tool is **Eeksha Studio**. The software does not presently perform AI inference or control robots.
+
+- [Static public preview source](docs/index.html) — browser-only synthetic 3D scene (no uploads).
+- [Release gate and GitHub Pages setup](docs/LAUNCH_CHECKLIST.md).
+- [Deployment safety notes](SECURITY.md) — Flask processing remains localhost-only.
+- Workspace (on this development branch): run `python webapp.py`, then visit `http://127.0.0.1:8012/workspace`.
+
 
 An auditable **RGB-D → calibrated 3D point cloud → semantic labels → quality report → export** pipeline for agricultural robotics research.
 
