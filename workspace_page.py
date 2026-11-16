@@ -39,7 +39,7 @@ button:disabled{opacity:.5;cursor:not-allowed}.action{display:inline-block;text-
 @media(max-width:980px){.layout{grid-template-columns:1fr}.tools{grid-template-columns:1fr 1fr}}
 @media(max-width:620px){header,.top{flex-direction:column;align-items:start}.tools,.stage{grid-template-columns:1fr}main{padding:14px}h1{font-size:28px}}
 </style></head>
-<body><header><div class="brand">EEK<span>SHA</span> <span class="eyebrow"> / Workspace v0.8</span></div>
+<body><header><div class="brand">EEK<span>SHA AI</span> <span class="eyebrow"> / Workspace v0.8</span></div>
 <nav><a href="/">Original processor</a><a href="/annotator">Annotator</a><a href="/correct">Corrections</a><a href="/review">Review</a></nav></header>
 <main><div class="top"><div><div class="eyebrow">Agricultural spatial data</div><h1>Dataset workspace</h1>
 <p>One place to inspect input readiness, run calibrated 3D processing, and open review tools.</p></div><div class="notice">LOCAL ONLY · No cloud storage · No accuracy certification</div></div>
@@ -50,6 +50,7 @@ button:disabled{opacity:.5;cursor:not-allowed}.action{display:inline-block;text-
 <label for="depth">Depth map · PNG</label><input id="depth" name="depth" type="file" accept=".png,image/png" required>
 <label for="labels">Semantic class mask · PNG, IDs 0–5</label><input id="labels" name="labels" type="file" accept=".png,image/png" required>
 <label for="calibration">Camera calibration · JSON</label><input id="calibration" name="calibration" type="file" accept=".json,application/json" required>
+<div class="buttons"><button type="button" class="secondary" id="preflight">Check input readiness</button></div>
 <div class="buttons"><button type="submit" id="process">Process real scene</button><button type="button" class="secondary" id="demo">Synthetic demo</button></div>
 </form>
 <div role="status" aria-live="polite" id="status">Select all four files, or explore the synthetic demo.</div>
@@ -88,6 +89,19 @@ $('rgb').addEventListener('change',()=>{
 });
 function status(message,kind=''){$('status').textContent=message;$('status').className=kind;}
 function reset(){$('points').textContent='—';$('coverage').textContent='—';$('qa').textContent='Awaiting input';$('classes').textContent='';$('download').hidden=true;$('visual').hidden=true;$('visual').removeAttribute('src');$('empty').hidden=false;}
+async function checkReadiness(){
+  const form=$('scene-form');
+  if(!form.reportValidity())return;
+  $('preflight').disabled=true;status('Checking image structure and calibration metadata…','loading');
+  try{
+    const response=await fetch('/preflight',{method:'POST',body:new FormData(form)});
+    const result=await response.json();
+    if(!response.ok)throw Error(result.error||'Input check failed');
+    status('Input structure accepted: '+result.width+' × '+result.height+' · '+result.depth_type+'. Calibration and semantic accuracy are NOT independently verified.');
+  }catch(error){status(error.message||'Input check failed','error');}
+  finally{$('preflight').disabled=false;}
+}
+$('preflight').addEventListener('click',checkReadiness);
 async function processScene(payload,synthetic){
   reset();$('process').disabled=true;$('demo').disabled=true;status('Processing scene locally…','loading');
   try{
