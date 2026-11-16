@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="Eeksha AI is an auditable RGB-D to semantic 3D data workspace for agricultural robotics researchers. Explore a synthetic interactive sample and run the open-source local tools.">
+<meta name="theme-color" content="#0b1712">
+<title>Eeksha AI — Spatial data for agricultural robotics</title>
+<style>
+:root{--bg:#09130f;--surface:#101f18;--line:#284436;--text:#f3faf5;--muted:#b1c7b9;--accent:#b9f5c9}
+*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:var(--bg);color:var(--text);font:16px/1.6 system-ui,-apple-system,Segoe UI,sans-serif}
+a{color:inherit;text-decoration:none}a:focus-visible,button:focus-visible{outline:3px solid #e9f5a0;outline-offset:3px}
+.container{max-width:1170px;margin:0 auto;padding:0 25px}header{border-bottom:1px solid var(--line);position:sticky;top:0;background:rgba(9,19,15,.96);z-index:10}
+.bar{display:flex;justify-content:space-between;align-items:center;min-height:72px;gap:20px}.logo{font-size:21px;font-weight:850;letter-spacing:-1px}.logo span{color:var(--accent)}
+nav{display:flex;gap:23px;align-items:center;font-size:14px;color:var(--muted)}nav a:hover{color:var(--text)}
+.tag{display:inline-block;border:1px solid #45624a;border-radius:99px;padding:5px 11px;color:var(--accent);font-size:12px;font-weight:700;letter-spacing:.6px}
+.hero{padding:100px 0 65px;max-width:840px}h1{font-size:clamp(45px,6.5vw,78px);line-height:1.08;letter-spacing:-3px;margin:22px 0}h1 em{color:var(--accent);font-style:normal}
+.lead{font-size:20px;max-width:660px;color:var(--muted);line-height:1.55}.buttons{display:flex;gap:12px;flex-wrap:wrap;margin-top:29px}
+.btn{background:var(--accent);color:#092017;border-radius:9px;padding:12px 19px;font-weight:800;font-size:14px;display:inline-block;border:1px solid var(--accent);cursor:pointer}
+.btn.secondary{background:transparent;color:var(--text);border-color:#486350}.btn:hover{filter:brightness(1.1)}
+section{padding:65px 0}section h2{font-size:clamp(26px,3vw,39px);line-height:1.2;letter-spacing:-1px;margin:10px 0 14px}
+.muted{color:var(--muted)}.layout{display:grid;grid-template-columns:1.35fr .65fr;gap:17px}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:15px;padding:23px}
+.viewer-head{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:15px}canvas{display:block;width:100%;height:390px;border-radius:11px;background:radial-gradient(circle at 50% 35%,#183128,#08120e);touch-action:none;cursor:grab}
+canvas:active{cursor:grabbing}.metrics{display:grid;grid-template-columns:1fr 1fr;gap:13px}.metric{padding:16px;border:1px solid var(--line);border-radius:10px}
+.metric strong{font-size:27px;display:block;font-variant-numeric:tabular-nums}.metric small{color:var(--muted)}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-top:11px}.legend b{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px}
+.controls{display:flex;gap:12px;align-items:center;margin-top:13px;flex-wrap:wrap}button{font:inherit}.controls button{background:#223e2d;border:1px solid #49664f;color:var(--text);border-radius:8px;padding:7px 13px;cursor:pointer}
+.cards{display:grid;grid-template-columns:repeat(3,1fr);gap:15px;margin-top:27px}.card{border:1px solid var(--line);border-radius:13px;padding:23px;background:var(--surface)}
+.card h3{margin:0 0 8px;font-size:18px}.card p{font-size:14px;color:var(--muted);margin:0}
+code{font-family:ui-monospace,Consolas,monospace;color:var(--accent)}pre{overflow:auto;background:#07100b;border:1px solid var(--line);padding:20px;border-radius:12px;line-height:1.8}
+.disclaimer{border-left:3px solid var(--accent);padding:10px 17px;background:#14241b;color:var(--muted);margin-top:23px;font-size:14px}
+footer{border-top:1px solid var(--line);padding:30px 0;color:var(--muted);font-size:13px}.footer{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}
+@media(max-width:800px){.layout,.cards{grid-template-columns:1fr}nav{gap:10px}.hero{padding:65px 0 35px}canvas{height:315px}}
+@media(max-width:550px){nav a:nth-child(2){display:none}h1{letter-spacing:-1.7px}.metrics{grid-template-columns:1fr 1fr}.container{padding:0 16px}}
+@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+</style></head>
+<body>
+<header><div class="container bar"><a href="#top" class="logo" aria-label="Eeksha AI home">EEK<span>SHA AI</span></a><nav><a href="#demo">Live example</a><a href="#capabilities">Product</a><a href="#run">Get started</a><a href="https://github.com/Roy0x/eeksha" rel="noopener noreferrer">GitHub ↗</a></nav></div></header>
+<main id="top"><div class="container"><div class="hero">
+<span class="tag">OPEN-SOURCE RESEARCH PREVIEW</span>
+<h1>Make agricultural 3D data <em>inspectable.</em></h1>
+<p class="lead">Eeksha AI converts calibrated RGB-D imagery and existing semantic labels into auditable 3D point clouds, quality reports, and exports for agricultural robotics research.</p>
+<div class="buttons"><a class="btn" href="#demo">Explore interactive sample</a><a class="btn secondary" href="#run">Run the local workspace</a></div>
+</div>
+<section id="demo" aria-labelledby="demo-title"><div class="viewer-head"><div><span class="tag">DEMO · SYNTHETIC DATA ONLY</span><h2 id="demo-title">Explore a semantic 3D scene.</h2><p class="muted">Drag to rotate. The generated geometry is a teaching example, not measured field data.</p></div></div>
+<div class="layout"><div class="panel"><canvas id="cloud" role="img" aria-label="Interactive synthetic 3D point cloud showing soil, crop and weed points"></canvas>
+<div class="legend"><span><b style="background:#ba8e67"></b>Soil</span><span><b style="background:#7ade9f"></b>Crop</span><span><b style="background:#e6d16c"></b>Weed</span></div>
+<div class="controls"><button id="reset" type="button">Reset view</button><label><input type="checkbox" id="soil" checked> Soil</label><label><input type="checkbox" id="crop" checked> Crop</label><label><input type="checkbox" id="weed" checked> Weed</label></div>
+</div><div class="panel"><h3>Preview details</h3><div class="metrics">
+<div class="metric"><strong id="points">—</strong><small>Displayed points</small></div><div class="metric"><strong>96.7%</strong><small>Sample depth coverage</small></div>
+<div class="metric"><strong>3</strong><small>Semantic categories</small></div><div class="metric"><strong>Local</strong><small>No uploaded data</small></div>
+</div><div class="disclaimer"><strong>What this demonstrates:</strong> 3D geometry, semantic coloring, filtering, and inspection. The preview uses generated points. It is not AI segmentation, an agricultural accuracy benchmark, or proof of robot safety.</div></div></div>
+</section>
+<section id="capabilities"><span class="tag">WORKFLOW</span><h2>From sensor data to reviewable artifacts.</h2>
+<div class="cards"><div class="card"><h3>01 / Reconstruct</h3><p>Use aligned RGB images, depth maps and explicit measured camera calibration to produce metric XYZ point clouds.</p></div>
+<div class="card"><h3>02 / Annotate and review</h3><p>Manually label scenes, resume brush corrections, and compare human label disagreement. Review is not ground-truth certification.</p></div>
+<div class="card"><h3>03 / Audit and export</h3><p>Inspect depth coverage, class counts, provenance and limitations; export PLY, NPZ, and JSON quality reports.</p></div></div>
+</section>
+<section id="run"><span class="tag">TRY THE ACTUAL PRODUCT</span><h2>Run the dataset workspace on your machine.</h2>
+<p class="muted">The complete processing tool currently runs locally with Python. Public uploads are not supported by this research preview.</p>
+<pre><code>git clone https://github.com/Roy0x/eeksha.git
+cd eeksha
+git switch feat/eeksha-ci-repro-20261113
+python -m pip install -r requirements.txt
+python webapp.py</code></pre>
+<p>Then visit <code>http://127.0.0.1:8012/workspace</code>.</p>
+<div class="buttons"><a class="btn" href="https://github.com/Roy0x/eeksha">Source and documentation ↗</a><a class="btn secondary" href="https://github.com/Roy0x/eeksha/issues">Report a problem ↗</a></div>
+<div class="disclaimer">Eeksha AI does not currently train or run a crop/weed prediction model, calibrate cameras, independently verify geometry, or control agricultural robots. Never treat these exports as certified crop-safe actuation data.</div>
+</section>
+</div></main><footer><div class="container footer"><span>© 2026 Eeksha AI · Agricultural spatial data research</span><span>Open-source research preview · No tracking scripts or external fonts</span></div></footer>
+<script>
+(function(){
+'use strict';
+const canvas=document.getElementById('cloud'),ctx=canvas.getContext('2d');
+let yaw=-0.45,pitch=0.65,drag=false,lastX=0,lastY=0;
+const pts=[],W=120,H=90;
+for(let y=3;y<H;y+=2){for(let x=0;x<W;x+=2){
+  const crop=((x-38)**2/20**2+(y-41)**2/28**2)<1;
+  const weed=((x-83)**2/12**2+(y-54)**2/16**2)<1;
+  const cls=crop?'crop':weed?'weed':'soil';
+  const z=crop?0.95:weed?1.05:1.25;
+  pts.push({x:(x-59.5)/110*z,y:(y-44.5)/110*z,z:z-1.12,cls});
+}}
+document.getElementById('points').textContent=pts.length.toLocaleString();
+const colors={soil:'#ba8e67',crop:'#7ade9f',weed:'#e6d16c'};
+function render(){
+ const rect=canvas.getBoundingClientRect(),dpr=Math.min(window.devicePixelRatio||1,2);
+ const cw=Math.max(1,Math.round(rect.width*dpr)),ch=Math.max(1,Math.round(rect.height*dpr));
+ if(canvas.width!==cw||canvas.height!==ch){canvas.width=cw;canvas.height=ch;}
+ ctx.clearRect(0,0,cw,ch);const scale=Math.min(cw,ch)*0.83;
+ const sy=Math.sin(yaw),cy=Math.cos(yaw),sp=Math.sin(pitch),cp=Math.cos(pitch);
+ const visible=pts.filter(p=>document.getElementById(p.cls).checked).map(p=>{
+   const xx=p.x*cy+p.z*sy,zz=-p.x*sy+p.z*cy;
+   const yy=p.y*cp-zz*sp,depth=p.y*sp+zz*cp;
+   const perspective=2.3/(2.3+depth);
+   return {x:cw/2+xx*scale*perspective,y:ch/2+yy*scale*perspective,depth,cls:p.cls};
+ }).sort((a,b)=>b.depth-a.depth);
+ for(const p of visible){ctx.fillStyle=colors[p.cls];ctx.globalAlpha=.86;ctx.beginPath();ctx.arc(p.x,p.y,Math.max(1.15,dpr*1.4),0,Math.PI*2);ctx.fill();}
+ ctx.globalAlpha=1;
+}
+function frame(){render();}
+const down=e=>{drag=true;lastX=e.clientX;lastY=e.clientY;canvas.setPointerCapture(e.pointerId);};
+canvas.addEventListener('pointerdown',down);
+canvas.addEventListener('pointermove',e=>{if(!drag)return;yaw+=(e.clientX-lastX)*.009;pitch=Math.min(1.45,Math.max(-1.45,pitch+(e.clientY-lastY)*.009));lastX=e.clientX;lastY=e.clientY;frame();});
+canvas.addEventListener('pointerup',()=>{drag=false;});
+canvas.addEventListener('pointercancel',()=>{drag=false;});
+document.getElementById('reset').addEventListener('click',()=>{yaw=-.45;pitch=.65;frame();});
+['soil','crop','weed'].forEach(k=>document.getElementById(k).addEventListener('change',frame));
+window.addEventListener('resize',frame);
+frame();
+})();
+</script></body></html>
