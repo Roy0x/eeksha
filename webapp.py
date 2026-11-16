@@ -19,6 +19,7 @@ from review import compare_exports, make_rgb_overlay
 from review_page import PAGE as REVIEW_PAGE
 from correction_page import PAGE as CORRECTION_PAGE
 from workspace_page import PAGE as WORKSPACE_PAGE
+from input_preflight import inspect_inputs
 from correction import apply_strokes, verify_source, load_exported_mask
 from correction_quality import summarize_correction
 from review import load_annotation
@@ -55,6 +56,19 @@ def index():
 def workspace():
     """Unifies the existing local dataset workflows; no remote storage."""
     return Response(WORKSPACE_PAGE, mimetype="text/html")
+
+
+@APP.post("/preflight")
+def preflight():
+    """Check source structure without processing or retaining uploaded files."""
+    fields = ("rgb", "depth", "labels", "calibration")
+    if any(key not in request.files or not request.files[key].filename for key in fields):
+        return {"error": "Upload RGB, depth, labels and calibration"}, 400
+    try:
+        payload = {key: request.files[key].read() for key in fields}
+        return inspect_inputs(payload["rgb"], payload["depth"], payload["labels"], payload["calibration"])
+    except ValueError as exc:
+        return {"error": str(exc), "ready": False}, 422
 
 
 @APP.get("/annotator")
