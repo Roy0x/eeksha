@@ -6,7 +6,7 @@
 - [Release gate and GitHub Pages setup](docs/LAUNCH_CHECKLIST.md).
 - [First-user real-data walkthrough](docs/FIRST_USER_GUIDE.md) — includes licensing, preflight checks, human labeling, and export review.
 - [Deployment safety notes](SECURITY.md) — Flask processing remains localhost-only.
-- Workspace (on this development branch): run `python webapp.py`, then visit `http://127.0.0.1:8012/workspace`.
+- Workspace (on this development branch): run `python webapp.py` (default port 8022; override with `EEKSHA_PORT`), then visit `http://127.0.0.1:8022/workspace`.
 
 
 An auditable **RGB-D → calibrated 3D point cloud → semantic labels → quality report → export** pipeline for agricultural robotics research.
@@ -23,7 +23,7 @@ python -m unittest -v
 
 ## Browser application (new)
 
-Run `python webapp.py` and open **http://127.0.0.1:8012** in Chrome.
+Run `python webapp.py` and open **http://127.0.0.1:8022** in Chrome.
 
 Choose all four aligned input files and press **Process real input**, or select **Load synthetic example** to explore without hardware. The page shows a rotatable 3D semantic scene and lets you download a ZIP containing the PLY, NPZ and QA report. It runs only on localhost and is not intended for public hosting. Maximum upload request: 30 MB.
 
@@ -53,7 +53,7 @@ The MVP processes **existing** semantic masks; it does not train a model, predic
 Suggested next step: run a real licensed agricultural RGB-D scene with its supplied camera calibration and labels, then record geometric accuracy against independent ground truth.
 # WE3DS real-data inspection (new)
 
-Run `py -3.13 webapp.py`, open `http://127.0.0.1:8012`, then use **WE3DS / Real dataset inspector**.
+Run `py -3.13 webapp.py`, open `http://127.0.0.1:8022`, then use **WE3DS / Real dataset inspector**.
 Upload matching files from the same WE3DS image ID: `data` (RGB),
 `fields/depth_refined` (16-bit distance map), and `fields/ground_truth` (class-index mask).
 The importer preserves all 19 WE3DS class IDs, interprets values in 0.1 mm units,
@@ -85,7 +85,7 @@ authors retain credit for capturing and curating the field data.
 ### Manual polygon annotation → labeled 3D
 
 Start the local Flask app (`python webapp.py`) and open
-`http://127.0.0.1:8012/annotator`. Load a matching RGB PNG, 16-bit depth
+`http://127.0.0.1:8022/annotator`. Load a matching RGB PNG, 16-bit depth
 PNG, and the published `camera_intrinsics.json`. Draw polygons around broccoli
 heads, leaves, soil, other crop, or weeds; finish each polygon before exporting.
 The ZIP includes `annotations.json`, `labels.png`, calibrated PLY/NPZ, the
@@ -105,7 +105,7 @@ surrounding leaves under the same class.
 
 ### V0.4 / Annotation agreement and disagreement review
 
-Open `http://127.0.0.1:8012/review` from the same local Flask app.
+Open `http://127.0.0.1:8022/review` from the same local Flask app.
 Upload two Eeksha annotation-export ZIPs for the same scene, ideally drawn
 independently. The comparison validates recorded polygon-to-mask consistency,
 checks RGB/depth source hashes and calibration equality, calculates per-class
@@ -117,7 +117,7 @@ resolve the colored disagreement regions before issuing an approved dataset.
 
 ### Human brush annotation, ZIP resume and auditable 3D re-export
 
-Open `http://127.0.0.1:8012/correct`. Select the RGB PNG. Optionally select
+Open `http://127.0.0.1:8022/correct`. Select the RGB PNG. Optionally select
 an Eeksha dataset export ZIP and click **Load annotation** to resume its existing
 class mask, or leave the ZIP blank to start from UNKNOWN. Resumed labels are
 accepted only when their recorded SHA-256 and source RGB match; the export
