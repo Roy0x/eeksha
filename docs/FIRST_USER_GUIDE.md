@@ -46,9 +46,10 @@ Check the output summary and ensure every imported semantic label remains `unkno
 2. Provide the **same** RGB, depth and source camera metadata to the annotation workflow.
 3. Use the editor to draw a small test class region and export the dataset ZIP.
 4. Open `/workspace`; select RGB, depth, exported `labels.png` and the Eeksha-compatible `calibration.json` from the export.
-5. Choose **Check input readiness**. The preflight checks image formats, dimensions, class IDs and required numeric calibration fields.
-6. Choose **Process real scene**. Review the source provenance warning and structural QA.
-7. Download the ZIP. Check that the PLY, NPZ and JSON report agree with the source and that class counts are plausible.
+5. If using original published `camera_intrinsics.json`, select it in the workspace and click **Convert source camera_intrinsics.json**. This applies only to the supported published metadata format, uses its documented alignment and units, and does not overwrite the source. Skip conversion if you already have Eeksha-compatible `calibration.json`.
+6. Choose **Check input readiness**. The preflight checks image formats, dimensions, class IDs and required numeric calibration fields.
+7. Choose **Process real scene**. Review the source provenance warning and structural QA.
+8. Download the ZIP. Check that the PLY, NPZ and JSON report agree with the source and that class counts are plausible.
 
 Preflight is only **structural**. It cannot prove that the input camera parameters are true, pixels are registered, labels are correct, or the resulting geometry is safe for actuation.
 
