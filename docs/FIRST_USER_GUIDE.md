@@ -17,7 +17,7 @@ py -3.13 -m unittest -v
 py -3.13 webapp.py
 ```
 
-Visit http://127.0.0.1:8012/workspace . The server intentionally listens on loopback only.
+Visit http://127.0.0.1:8022/workspace . The server intentionally listens on loopback only.
 
 ## Step 2 — Verify the synthetic path
 
@@ -42,7 +42,7 @@ Check the output summary and ensure every imported semantic label remains `unkno
 
 ## Step 4 — Label and inspect
 
-1. Open `http://127.0.0.1:8012/annotator` for polygons or `/correct` for brush correction.
+1. Open `http://127.0.0.1:8022/annotator` for polygons or `/correct` for brush correction.
 2. Provide the **same** RGB, depth and source camera metadata to the annotation workflow.
 3. Use the editor to draw a small test class region and export the dataset ZIP.
 4. Open `/workspace`; select RGB, depth, exported `labels.png` and the Eeksha-compatible `calibration.json` from the export.
