@@ -50,6 +50,8 @@ button:disabled{opacity:.5;cursor:not-allowed}.action{display:inline-block;text-
 <label for="depth">Depth map · PNG</label><input id="depth" name="depth" type="file" accept=".png,image/png" required>
 <label for="labels">Semantic class mask · PNG, IDs 0–5</label><input id="labels" name="labels" type="file" accept=".png,image/png" required>
 <label for="calibration">Camera calibration · JSON</label><input id="calibration" name="calibration" type="file" accept=".json,application/json" required>
+<div class="buttons"><button type="button" class="secondary" id="convert">Convert source camera_intrinsics.json</button></div>
+<p class="hint" id="cal-status">If your source file has nested rgb_intrinsics, convert it here. Other calibration formats are not guessed.</p>
 <div class="buttons"><button type="button" class="secondary" id="preflight">Check input readiness</button></div>
 <div class="buttons"><button type="submit" id="process">Process real scene</button><button type="button" class="secondary" id="demo">Synthetic demo</button></div>
 </form>
@@ -81,6 +83,28 @@ button:disabled{opacity:.5;cursor:not-allowed}.action{display:inline-block;text-
 <script>
 const $=id=>document.getElementById(id);
 let currentPreview=null;
+let convertedCalibration=null;
+$('calibration').addEventListener('change',()=>{convertedCalibration=null;$('cal-status').textContent='No calibration conversion in use.';});
+function sceneData(){
+  const data=new FormData($('scene-form'));
+  if(convertedCalibration)data.set('calibration',new Blob([JSON.stringify(convertedCalibration)],{type:'application/json'}),'calibration.json');
+  return data;
+}
+$('convert').addEventListener('click',async()=>{
+  const file=$('calibration').files[0];
+  if(!file){status('Choose camera_intrinsics.json before converting.','error');return;}
+  $('convert').disabled=true;convertedCalibration=null;status('Checking source camera metadata…','loading');
+  try{
+    const data=new FormData();data.set('calibration',file);
+    const response=await fetch('/calibration/convert',{method:'POST',body:data});
+    const result=await response.json();
+    if(!response.ok)throw Error(result.error||'Conversion failed');
+    convertedCalibration=result.calibration;
+    $('cal-status').textContent='Converted in memory: '+convertedCalibration.width+' × '+convertedCalibration.height+' · '+convertedCalibration.depth_type+' · original file unchanged.';
+    status(result.warning+'. Use Check input readiness before processing.');
+  }catch(error){$('cal-status').textContent='Conversion unavailable: '+error.message;status(error.message,'error');}
+  finally{$('convert').disabled=false;}
+});
 $('rgb').addEventListener('change',()=>{
   if(currentPreview){URL.revokeObjectURL(currentPreview);currentPreview=null;}
   const file=$('rgb').files[0];
@@ -94,7 +118,7 @@ async function checkReadiness(){
   if(!form.reportValidity())return;
   $('preflight').disabled=true;status('Checking image structure and calibration metadata…','loading');
   try{
-    const response=await fetch('/preflight',{method:'POST',body:new FormData(form)});
+    const response=await fetch('/preflight',{method:'POST',body:sceneData()});
     const result=await response.json();
     if(!response.ok)throw Error(result.error||'Input check failed');
     status('Input structure accepted: '+result.width+' × '+result.height+' · '+result.depth_type+'. Calibration and semantic accuracy are NOT independently verified.');
@@ -122,6 +146,6 @@ async function processScene(payload,synthetic){
   }catch(error){status(error.message||'Unknown error','error');}
   finally{$('process').disabled=false;$('demo').disabled=false;}
 }
-$('scene-form').addEventListener('submit',e=>{e.preventDefault();processScene(new FormData(e.currentTarget),false);});
+$('scene-form').addEventListener('submit',e=>{e.preventDefault();processScene(sceneData(),false);});
 $('demo').addEventListener('click',()=>{let data=new FormData();data.set('demo','true');processScene(data,true);});
 </script></body></html>'''
