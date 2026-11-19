@@ -71,6 +71,34 @@ def preflight():
         return {"error": str(exc), "ready": False}, 422
 
 
+@APP.post("/calibration/convert")
+def calibration_convert():
+    """Normalize supported published RGB camera metadata without guessing values."""
+    upload = request.files.get("calibration")
+    if not upload or not upload.filename:
+        return {"error": "Select a source camera_intrinsics.json file"}, 400
+    raw = upload.read()
+    if not raw or len(raw) > 1024 * 1024:
+        return {"error": "Calibration JSON must be nonempty and at most 1 MB"}, 422
+    try:
+        with tempfile.TemporaryDirectory() as folder:
+            source = Path(folder) / "camera_intrinsics.json"
+            destination = Path(folder) / "calibration.json"
+            source.write_bytes(raw)
+            converted = convert_intrinsics(source, destination)
+            if not all(np.isfinite(converted[key]) for key in ("fx", "fy", "cx", "cy", "depth_scale")):
+                raise ValueError("Converted camera intrinsics contain nonfinite values")
+            if converted["fx"] <= 0 or converted["fy"] <= 0:
+                raise ValueError("Converted focal lengths must be positive")
+        return {
+            "calibration": converted,
+            "source_type": "SUPPORTED_MENDELEY_RGB_INTRINSICS",
+            "warning": "Converted from source metadata, not independently measured or geometry-validated",
+        }
+    except (ValueError, KeyError, TypeError, OverflowError, UnicodeError, json.JSONDecodeError, OSError) as exc:
+        return {"error": f"Cannot convert source calibration: {exc}"}, 422
+
+
 @APP.get("/annotator")
 def annotator():
     return Response(ANNOTATOR_PAGE, mimetype="text/html")
