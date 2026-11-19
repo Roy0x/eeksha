@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import io
+import os
 import base64
 import hashlib
 import json
@@ -366,4 +367,4 @@ PAGE = '''<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name=
 
 
 if __name__ == "__main__":
-    APP.run(host="127.0.0.1", port=8012, debug=False)
+    APP.run(host="127.0.0.1", port=int(os.environ.get("EEKSHA_PORT", "8022")), debug=False)
