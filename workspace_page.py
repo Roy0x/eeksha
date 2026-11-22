@@ -45,6 +45,10 @@ button:disabled{opacity:.5;cursor:not-allowed}.action{display:inline-block;text-
 <p>One place to inspect input readiness, run calibrated 3D processing, and open review tools.</p></div><div class="notice">LOCAL ONLY · No cloud storage · No accuracy certification</div></div>
 <div class="layout"><div class="panel"><h2>01 / Import a scene</h2>
 <p>Upload aligned, distortion-corrected RGB, depth, semantic labels and recorded calibration.</p>
+<div class="notice">Already annotated a scene? Reimport its Eeksha ZIP with the exact original RGB and depth files. Source hashes must match.</div>
+<label for="annotation-zip">Existing annotation export · ZIP (optional)</label><input type="file" id="annotation-zip" accept=".zip,application/zip">
+<div class="buttons"><button type="button" class="secondary" id="import-annotation">Import labels from ZIP</button></div>
+<p class="hint" id="import-status">Imported labels and calibration stay in this browser session; source files are not changed.</p>
 <form id="scene-form">
 <label for="rgb">RGB image · PNG</label><input id="rgb" name="rgb" type="file" accept=".png,image/png" required>
 <label for="depth">Depth map · PNG</label><input id="depth" name="depth" type="file" accept=".png,image/png" required>
@@ -84,12 +88,41 @@ button:disabled{opacity:.5;cursor:not-allowed}.action{display:inline-block;text-
 const $=id=>document.getElementById(id);
 let currentPreview=null;
 let convertedCalibration=null;
-$('calibration').addEventListener('change',()=>{convertedCalibration=null;$('cal-status').textContent='No calibration conversion in use.';});
+let importedLabels=null;
+function clearImportedLabels(){importedLabels=null;$('labels').required=true;$('import-status').textContent='Select a matching Eeksha ZIP to import labels.';}
+$('rgb').addEventListener('change',clearImportedLabels);
+$('depth').addEventListener('change',clearImportedLabels);
+$('labels').addEventListener('change',()=>{if($('labels').files.length)clearImportedLabels();});
+$('calibration').addEventListener('change',()=>{convertedCalibration=null;$('calibration').required=true;$('cal-status').textContent='No calibration conversion in use.';});
 function sceneData(){
   const data=new FormData($('scene-form'));
+  if(importedLabels)data.set('labels',importedLabels,'labels.png');
   if(convertedCalibration)data.set('calibration',new Blob([JSON.stringify(convertedCalibration)],{type:'application/json'}),'calibration.json');
   return data;
 }
+$('import-annotation').addEventListener('click',async()=>{
+  const zip=$('annotation-zip').files[0],rgb=$('rgb').files[0],depth=$('depth').files[0];
+  if(!zip||!rgb||!depth){status('Select the annotation ZIP and its exact original RGB and depth images first.','error');return;}
+  $('import-annotation').disabled=true;
+  clearImportedLabels();convertedCalibration=null;
+  status('Checking annotation ZIP and matching source hashes…','loading');
+  try{
+    const data=new FormData();data.set('archive',zip);data.set('rgb',rgb);data.set('depth',depth);
+    const response=await fetch('/workspace/import-annotation',{method:'POST',body:data});
+    const result=await response.json();
+    if(!response.ok)throw Error(result.error||'Import failed');
+    const decoded=atob(result.labels_png_base64);
+    const bytes=Uint8Array.from(decoded,c=>c.charCodeAt(0));
+    importedLabels=new Blob([bytes],{type:'image/png'});
+    convertedCalibration=result.calibration;
+    $('labels').required=false;
+    $('calibration').required=false;
+    $('cal-status').textContent='Using recorded calibration from verified annotation ZIP.';
+    $('import-status').textContent='Verified annotation import · '+result.review_status+'. Labels prepared for preflight and processing.';
+    status(result.warning+'. Click Check input readiness, then Process real scene.');
+  }catch(error){clearImportedLabels();status(error.message,'error');}
+  finally{$('import-annotation').disabled=false;}
+});
 $('convert').addEventListener('click',async()=>{
   const file=$('calibration').files[0];
   if(!file){status('Choose camera_intrinsics.json before converting.','error');return;}
