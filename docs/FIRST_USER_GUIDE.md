@@ -77,3 +77,7 @@ Collect reported time-to-first-success, concrete reproducible failures, and whet
 - Product tests and documented demonstrations are not substitutes for real external-user validation.
 
 File issues at https://github.com/Roy0x/eeksha/issues with the step, error text, platform, and non-sensitive input characteristics. Do not publicly attach private farm imagery or sensitive data.
+
+## Reimport an existing annotation ZIP into Workspace
+
+When an Eeksha polygon or brush export exists, open `http://127.0.0.1:8022/workspace`, select the exact original RGB and depth PNG files and the exported ZIP, then choose **Import labels from ZIP**. The server verifies the exported mask's SHA-256 and that both original source files match the QA report. It restores the mask and the previously recorded Eeksha calibration **in memory**, without rewriting your original files. Next choose **Check input readiness** and **Process real scene**. You do not need to extract `labels.png` by hand. A source mismatch is rejected, even if the pictures have identical dimensions. Source matching does not verify semantic correctness, depth geometry, or independently reviewed ground truth.
