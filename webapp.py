@@ -72,6 +72,44 @@ def preflight():
         return {"error": str(exc), "ready": False}, 422
 
 
+@APP.post("/workspace/import-annotation")
+def workspace_import_annotation():
+    """Import a verified Eeksha ZIP mask for the user's original RGB/depth files."""
+    if any(k not in request.files or not request.files[k].filename for k in ("archive", "rgb", "depth")):
+        return {"error": "Choose annotation ZIP and the exact original RGB and depth PNGs"}, 400
+    archive = request.files["archive"].read()
+    rgb = request.files["rgb"].read()
+    depth = request.files["depth"].read()
+    if not rgb or not depth or len(rgb) > 20 * 1024 * 1024 or len(depth) > 20 * 1024 * 1024:
+        return {"error": "RGB and depth files must be nonempty and each under 20 MB"}, 422
+    try:
+        labels, report = load_exported_mask(archive)
+        verify_source(rgb, report["sources"]["rgb"], "RGB")
+        verify_source(depth, report["sources"]["depth"], "Depth")
+        with Image.open(io.BytesIO(rgb)) as rgb_image:
+            if rgb_image.format != "PNG" or rgb_image.mode not in ("RGB", "RGBA"):
+                raise ValueError("Original RGB must be a PNG image")
+            if rgb_image.size != (labels.shape[1], labels.shape[0]):
+                raise ValueError("Imported labels do not match RGB dimensions")
+        with Image.open(io.BytesIO(depth)) as depth_image:
+            if depth_image.format != "PNG" or depth_image.size != (labels.shape[1], labels.shape[0]):
+                raise ValueError("Imported labels do not match depth PNG dimensions")
+        label_buf = io.BytesIO()
+        Image.fromarray(labels.astype(np.uint8), mode="L").save(label_buf, format="PNG")
+        calibration = report["calibration"]
+        if not all(k in calibration for k in ("fx", "fy", "cx", "cy", "depth_scale", "depth_type")):
+            raise ValueError("Dataset QA calibration is missing required fields")
+        # This is source-matched structural reimport, not annotation certification.
+        return {
+            "labels_png_base64": base64.b64encode(label_buf.getvalue()).decode("ascii"),
+            "calibration": calibration,
+            "review_status": report.get("annotation_review", "UNVERIFIED"),
+            "warning": "Source hashes verified; semantic correctness and geometry remain unverified",
+        }
+    except (ValueError, KeyError, TypeError, OSError, UnidentifiedImageError) as exc:
+        return {"error": str(exc)}, 422
+
+
 @APP.post("/calibration/convert")
 def calibration_convert():
     """Normalize supported published RGB camera metadata without guessing values."""
