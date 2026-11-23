@@ -70,6 +70,7 @@ button:disabled{opacity:.5;cursor:not-allowed}.action{display:inline-block;text-
 <div class="tile"><div class="eyebrow">Input provenance</div><div id="provenance">Not processed</div><div class="small" id="source">No dataset selected</div></div>
 <div class="tile"><div class="eyebrow">Reported status</div><div id="qa">Awaiting input</div><div class="small">Structural QA, not ground truth</div></div></div>
 <div id="classes" class="hint" style="margin-top:13px">Class counts will appear after processing.</div>
+<div class="notice" id="coverage-details" style="margin-top:12px" hidden></div>
 <div class="buttons"><a id="download" hidden class="action" href="#">Download export ZIP</a></div>
 </div>
 <div class="panel"><h2>03 / Semantic 3D preview</h2>
@@ -145,7 +146,7 @@ $('rgb').addEventListener('change',()=>{
   else{$('image').hidden=true;$('image').removeAttribute('src');}
 });
 function status(message,kind=''){$('status').textContent=message;$('status').className=kind;}
-function reset(){$('points').textContent='—';$('coverage').textContent='—';$('qa').textContent='Awaiting input';$('classes').textContent='';$('download').hidden=true;$('visual').hidden=true;$('visual').removeAttribute('src');$('empty').hidden=false;}
+function reset(){$('coverage-details').hidden=true;$('coverage-details').textContent='';$('points').textContent='—';$('coverage').textContent='—';$('qa').textContent='Awaiting input';$('classes').textContent='';$('download').hidden=true;$('visual').hidden=true;$('visual').removeAttribute('src');$('empty').hidden=false;}
 async function checkReadiness(){
   const form=$('scene-form');
   if(!form.reportValidity())return;
@@ -173,6 +174,21 @@ async function processScene(payload,synthetic){
     $('source').textContent=q.synthetic_demo?'Not collected in a field':'Geometry and labels are not independently validated';
     $('qa').textContent=q.status||'Unknown';
     $('classes').textContent='Class counts: '+Object.entries(q.class_counts||{}).map(([name,count])=>name+' '+Number(count).toLocaleString()).join(' · ');
+    if(q.coverage_diagnostics){
+      const c=q.coverage_diagnostics;
+      const messages=[
+        'Labeled 3D points: '+c.labeled_valid_depth_points.toLocaleString()+' / '+c.valid_depth_pixels.toLocaleString()+
+          ' ('+(c.labeled_valid_depth_fraction*100).toFixed(1)+'%)',
+        'Unknown 3D points: '+c.unknown_valid_depth_points.toLocaleString(),
+        'Depth excluded: '+c.missing_or_nonpositive_depth_pixels.toLocaleString()+' nonpositive · '+
+          c.over_max_depth_pixels.toLocaleString()+' above limit · '+c.nonfinite_depth_pixels.toLocaleString()+' nonfinite',
+        'Review flags: '+(c.flags.length?c.flags.join(', '):'None at threshold')
+      ];
+      $('coverage-details').textContent=messages.join('\n');
+      $('coverage-details').style.whiteSpace='pre-line';
+      $('coverage-details').hidden=false;
+    }
+
     $('download').href='/download/'+encodeURIComponent(result.id);$('download').hidden=false;
     $('visual').src='/viewer/'+encodeURIComponent(result.id);$('visual').hidden=false;$('empty').hidden=true;
     status(synthetic?'Synthetic demonstration completed. Not field evidence.':'Processing completed. Structural quality only; verify labels and geometry independently.');
