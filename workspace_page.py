@@ -90,7 +90,7 @@ const $=id=>document.getElementById(id);
 let currentPreview=null;
 let convertedCalibration=null;
 let importedLabels=null;
-function clearImportedLabels(){importedLabels=null;$('labels').required=true;$('import-status').textContent='Select a matching Eeksha ZIP to import labels.';}
+function clearImportedLabels(){if(importedLabels){convertedCalibration=null;$('calibration').required=true;$('cal-status').textContent='Scene changed: select or reconvert matching calibration.';}importedLabels=null;$('labels').required=true;$('import-status').textContent='Select a matching Eeksha ZIP to import labels.';}
 $('rgb').addEventListener('change',clearImportedLabels);
 $('depth').addEventListener('change',clearImportedLabels);
 $('labels').addEventListener('change',()=>{if($('labels').files.length)clearImportedLabels();});
