@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 import numpy as np
 from PIL import Image
+from coverage_diagnostics import summarize_coverage
 
 CLASSES = {0: "unknown", 1: "soil", 2: "crop", 3: "weed", 4: "broccoli_head", 5: "broccoli_leaf"}
 
@@ -60,6 +61,7 @@ def process(rgb_path: Path, depth_path: Path, labels_path: Path, calibration_pat
     report = {
         "status": "PASS", "points": len(xyz), "pixels": int(depth.size),
         "depth_coverage": round(float(valid.mean()), 6),
+        "coverage_diagnostics": summarize_coverage(depth, labels, scale, max_depth_m),
         "class_counts": {name: int((classes == code).sum()) for code, name in CLASSES.items()},
         "bounds_m": {axis: [float(xyz[:, i].min()), float(xyz[:, i].max())] for i, axis in enumerate("xyz")},
         "calibration": calibration, "depth_type": depth_type, "max_depth_m": max_depth_m,
