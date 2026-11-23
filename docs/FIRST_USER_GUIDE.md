@@ -81,3 +81,9 @@ File issues at https://github.com/Roy0x/eeksha/issues with the step, error text,
 ## Reimport an existing annotation ZIP into Workspace
 
 When an Eeksha polygon or brush export exists, open `http://127.0.0.1:8022/workspace`, select the exact original RGB and depth PNG files and the exported ZIP, then choose **Import labels from ZIP**. The server verifies the exported mask's SHA-256 and that both original source files match the QA report. It restores the mask and the previously recorded Eeksha calibration **in memory**, without rewriting your original files. Next choose **Check input readiness** and **Process real scene**. You do not need to extract `labels.png` by hand. A source mismatch is rejected, even if the pictures have identical dimensions. Source matching does not verify semantic correctness, depth geometry, or independently reviewed ground truth.
+
+## Coverage diagnostics (v0.8 QA improvement)
+
+Every newly processed scene exports `qa_report.json.coverage_diagnostics`. This separates valid-depth pixels, zero/nonpositive or over-limit depths, labeled pixels with valid depth, and UNKNOWN valid-depth points. It also reports labeled fractions and explicit review flags when depth coverage or labeled valid-depth coverage is below 50%. The Workspace surfaces these counts after **Process real scene**. Threshold flags are *review prompts*, not a QA failure, sensor diagnosis, segmentation accuracy estimate, or proof of robot readiness.
+
+A previously exported ZIP will not contain these new fields until the exact source-matched scene is processed again with the updated code. The original scene's source hashes should remain available in its annotation ZIP for provenance verification.
