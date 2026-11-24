@@ -21,6 +21,7 @@ from review_page import PAGE as REVIEW_PAGE
 from correction_page import PAGE as CORRECTION_PAGE
 from workspace_page import PAGE as WORKSPACE_PAGE
 from input_preflight import inspect_inputs
+from qa_compare import compare_qa
 from correction import apply_strokes, verify_source, load_exported_mask
 from correction_quality import summarize_correction
 from review import load_annotation
@@ -70,6 +71,17 @@ def preflight():
         return inspect_inputs(payload["rgb"], payload["depth"], payload["labels"], payload["calibration"])
     except ValueError as exc:
         return {"error": str(exc), "ready": False}, 422
+
+
+@APP.post("/workspace/compare-qa")
+def workspace_compare_qa():
+    """Compare source-matched baseline and corrected Eeksha export ZIPs."""
+    if any(name not in request.files or not request.files[name].filename for name in ("before", "after")):
+        return {"error": "Select baseline and corrected Eeksha ZIPs"}, 400
+    try:
+        return compare_qa(request.files["before"].read(), request.files["after"].read())
+    except (ValueError, OSError, TypeError, KeyError) as error:
+        return {"error": str(error)}, 422
 
 
 @APP.post("/workspace/import-annotation")
