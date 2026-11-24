@@ -78,7 +78,16 @@ button:disabled{opacity:.5;cursor:not-allowed}.action{display:inline-block;text-
 <iframe id="visual" class="frame" title="Interactive semantic point cloud" hidden sandbox="allow-scripts"></iframe>
 <p class="hint">Preview may downsample points. Export retains the full valid-depth cloud.</p>
 </div>
-<div class="panel"><h2>04 / Human labeling workflow</h2><div class="tools">
+<div class="panel"><h2>04 / Compare baseline and corrected QA</h2>
+<p>Compare exports of the exact same RGB/depth scene. Source hashes, calibration, and depth limits must match.</p>
+<form id="qa-compare-form">
+<label for="qa-before">Baseline Eeksha export · ZIP</label><input id="qa-before" name="before" type="file" accept=".zip,application/zip" required>
+<label for="qa-after">Corrected Eeksha export · ZIP</label><input id="qa-after" name="after" type="file" accept=".zip,application/zip" required>
+<div class="buttons"><button type="submit" id="qa-compare">Compare QA reports</button></div>
+</form>
+<div id="qa-comparison" class="notice" hidden aria-live="polite"></div>
+<p class="hint">Deltas do not prove label accuracy. Compare only the exact same scene.</p></div>
+<div class="panel"><h2>05 / Human labeling workflow</h2><div class="tools">
 <div class="tool"><strong>Polygon annotation</strong><p>Trace human-defined crop, soil and weed regions.</p><a href="/annotator">Open annotator →</a></div>
 <div class="tool"><strong>Brush correction</strong><p>Resume exported labels, correct pixels, and re-export.</p><a href="/correct">Open editor →</a></div>
 <div class="tool"><strong>Disagreement review</strong><p>Compare two independent annotation ZIPs.</p><a href="/review">Open review →</a></div>
@@ -195,6 +204,28 @@ async function processScene(payload,synthetic){
   }catch(error){status(error.message||'Unknown error','error');}
   finally{$('process').disabled=false;$('demo').disabled=false;}
 }
+$('qa-compare-form').addEventListener('submit',async e=>{
+  e.preventDefault();
+  const button=$('qa-compare'),display=$('qa-comparison');
+  button.disabled=true;display.hidden=false;display.textContent='Comparing source hashes and quality reports…';
+  try{
+    const response=await fetch('/workspace/compare-qa',{method:'POST',body:new FormData(e.currentTarget)});
+    const result=await response.json();
+    if(!response.ok)throw Error(result.error||'QA comparison failed');
+    const format=n=>n.toLocaleString(undefined,{maximumFractionDigits:2});
+    display.textContent=[
+      'Same source verified · labels changed: '+(result.source_labels_changed?'yes':'no'),
+      'Valid 3D points: '+format(result.points_before)+' → '+format(result.points_after),
+      'Labeled valid-depth points: '+format(result.labeled_valid_points_before)+' → '+format(result.labeled_valid_points_after),
+      'Labeled valid-depth coverage: '+format(100*result.labeled_valid_fraction_before)+'% → '+format(100*result.labeled_valid_fraction_after)+'%',
+      'Class deltas: '+Object.entries(result.class_deltas).map(([name,count])=>name+' '+(count>=0?'+':'')+format(count)).join(' · '),
+      'Review status: '+result.review_status_before+' → '+result.review_status_after,
+      result.warning
+    ].join('\n');
+    display.style.whiteSpace='pre-line';
+  }catch(error){display.textContent=error.message;display.style.whiteSpace='pre-line';}
+  finally{button.disabled=false;}
+});
 $('scene-form').addEventListener('submit',e=>{e.preventDefault();processScene(sceneData(),false);});
 $('demo').addEventListener('click',()=>{let data=new FormData();data.set('demo','true');processScene(data,true);});
 </script></body></html>'''
